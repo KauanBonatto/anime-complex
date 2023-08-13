@@ -11,9 +11,9 @@ const nextConfig = {
       remotePatterns: [
         {
           protocol: 'https',
-          hostname: 'source.unsplash.com',
+          hostname: 'gogocdn.net',
           port: '',
-          pathname: '/random',
+          pathname: '/**',
         },
       ],
     },
