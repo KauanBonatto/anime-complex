@@ -1,6 +1,11 @@
+'use client';
+
+import Navbar from "@/components/Navbar";
+
+
 const HomeView = () => {
     return (
-        <div>Anime</div>
+        <Navbar />
     );
 }
 

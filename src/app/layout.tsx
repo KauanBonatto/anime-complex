@@ -1,22 +1,32 @@
+'use client';
 import './globals.css';
-import type { Metadata } from 'next';
+
+// Fonts
 import { Rubik } from 'next/font/google';
 
-const rubik = Rubik({ subsets: ['latin'] });
+// Theme
+import { theme } from '@/customTheme';
+import { ThemeProvider } from "@mui/material/styles";
 
-export const metadata: Metadata = {
-  title: 'Anime Complex',
-  description: 'Anime website',
-};
+const rubik = Rubik({ subsets: ['latin'] });
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+
   return (
     <html lang="pt-BR">
-      <body className={rubik.className}>{children}</body>
+      <head>
+        <title>Anime Complex</title>
+        <link rel="icon" href="favicon.ico" type="image/x-icon" />
+      </head>
+      <body className={rubik.className}>
+        <ThemeProvider theme={theme}>
+          {children}
+        </ThemeProvider>  
+      </body>
     </html>
   );
 };
