@@ -14,12 +14,12 @@ const NavbarComponent = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           flexDirection: 'row', 
-          paddingBlock: 2, 
+          paddingBlock: 4, 
           paddingInline: 5 
         }}>
         <Image
           priority
-          width={120}
+          width={150}
           src={logoSvg}
           draggable={false}
           alt="Anime complex"
@@ -28,7 +28,7 @@ const NavbarComponent = () => {
           <Link
             display='flex'
             alignItems='center' 
-            color='text.primary' 
+            color='text.secondary' 
             href="/animes/popular"
             underline="none"
             >
@@ -38,7 +38,7 @@ const NavbarComponent = () => {
           <Link
             display='flex' 
             alignItems='center' 
-            color='text.primary' 
+            color='text.secondary' 
             href="/animes/popular"
             underline='none'
             >

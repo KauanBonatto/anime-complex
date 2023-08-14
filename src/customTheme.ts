@@ -17,7 +17,7 @@ const primary = {
 export const theme = createTheme({
   typography: {
     allVariants: {
-      color: '#ffffff'
+      color: primary[500]
     },
     fontFamily: [
       '__Rubik_98e1b5',
@@ -31,8 +31,8 @@ export const theme = createTheme({
   },
   palette: {
     text: {
-      primary: '#ffffff',
-      secondary: '#0e000f',
+      primary: '#0e000f',
+      secondary: '#ffffff',
     },
     background: {
       default: '#3d0240',
