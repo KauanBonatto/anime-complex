@@ -1,6 +1,7 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
+import GenderFilter from "@/components/GenderFilter";
 import Navbar from "@/components/Navbar";
 import AnimeService from "@/services/AnimeSevice";
 import { Box, Card, LinearProgress } from "@mui/material";
@@ -8,6 +9,8 @@ import { useCallback, useState } from "react";
 
 const HomeView = () => {
   const [loading, setLoading] = useState(false);
+
+  const [filters, setFilters] = useState<string[]>([]);
 
   const [popularAnimeList, setPopularAnimeList] =
     useState<ResponseApiProps | null>(null);
@@ -42,6 +45,18 @@ const HomeView = () => {
     return { ...response, results: animeCleanedList };
   };
 
+  const filterAnimesList = useCallback(async () => {
+    const animePopularCleanedList = popularAnimeList?.results.filter(
+      (anime: AnimeProps) => {
+        return filters.every((genre) => anime.genres?.includes(genre));
+      }
+    ) as AnimeProps[];
+    setPopularAnimeList({
+      ...popularAnimeList,
+      results: animePopularCleanedList,
+    } as ResponseApiProps);
+  }, [filters, popularAnimeList]);
+
   return (
     <Box width="100%">
       {loading && (
@@ -54,22 +69,32 @@ const HomeView = () => {
       <Card
         sx={{
           borderRadius: 0,
-          display: "flex",
-          flexWrap: "wrap",
           p: 5,
-          gap: 12,
         }}
       >
-        <AnimeGrid
-          title="Animes Populares"
-          animeData={popularAnimeList as ResponseApiProps}
-          getAnimeData={getAnimePopularData}
+        <GenderFilter
+          filters={filters}
+          setFilters={setFilters}
+          filterAnimesList={filterAnimesList}
         />
-        <AnimeGrid
-          title="Adicionados Recentemente"
-          animeData={recentAnimeList as ResponseApiProps}
-          getAnimeData={getAnimeRecentData}
-        />
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <AnimeGrid
+            title="Animes Populares"
+            animeData={popularAnimeList as ResponseApiProps}
+            getAnimeData={getAnimePopularData}
+          />
+          <AnimeGrid
+            title="Adicionados Recentemente"
+            animeData={recentAnimeList as ResponseApiProps}
+            getAnimeData={getAnimeRecentData}
+          />
+        </Box>
       </Card>
     </Box>
   );
