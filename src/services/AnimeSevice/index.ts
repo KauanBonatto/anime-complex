@@ -2,7 +2,7 @@ import { apiService } from "../ApiService";
 
 class AnimeServiceClass {
   async getAnimeBySearch(search: string, page: number = 1): Promise<ResponseApiProps> {
-    const { data } = await apiService.get(`/${search}`, { params: { query: search, page } });
+    const { data } = await apiService.get(`/${search}`, { params: { page } });
     return data;
   }
 

@@ -1,91 +1,78 @@
-'use client';
+"use client";
 
-import { useEffect, useCallback, useState } from "react";
-import { Box, Button, Card, Grid, TextField, Typography } from "@mui/material";
-import AnimeService from "@/services/AnimeSevice";
-import AnimeCard from "@/components/AnimeCard";
+import AnimeGrid from "@/components/AnimeGrid";
 import Navbar from "@/components/Navbar";
-
+import AnimeService from "@/services/AnimeSevice";
+import { Box, Card, LinearProgress } from "@mui/material";
+import { useCallback, useState } from "react";
 
 const HomeView = () => {
-  const [search, setSearch] = useState<string>('');
-  const [pageNumber, setPageNumber] = useState<number>(1);
-  const [popularAnimeList, setPopularAnimeList] = useState<ResponseApiProps | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const carregarDados = useCallback(async () => {
-    if (search?.length == 0 || !popularAnimeList) {
-      const popularAnimeListData = await AnimeService.getTopAiringAnime(pageNumber);
-      setPopularAnimeList(popularAnimeListData);
-    }
-  }, [pageNumber, popularAnimeList, search?.length])
+  const [popularAnimeList, setPopularAnimeList] =
+    useState<ResponseApiProps | null>(null);
 
-  const carregarPesquisa = useCallback(async () => {
-    if (search) {
-      const popularAnimeListData = await AnimeService.getAnimeBySearch(search, pageNumber);
-      setPopularAnimeList(popularAnimeListData);
-    }
-  }, [pageNumber, search])
+  const [recentAnimeList, setRecentAnimeList] =
+    useState<ResponseApiProps | null>(null);
 
-  useEffect(() => {
-    carregarDados();
-  }, [carregarDados])
+  const getAnimePopularData = useCallback(async (pageNumber: number) => {
+    setLoading(true);
+    const popularAnimeListData = await AnimeService.getTopAiringAnime(
+      pageNumber
+    );
+    setPopularAnimeList(cleanAnimeList(popularAnimeListData));
+    setLoading(false);
+  }, []);
 
-  useEffect(() => {
-    carregarPesquisa();
-  }, [carregarPesquisa])
+  const getAnimeRecentData = useCallback(async (pageNumber: number) => {
+    setLoading(true);
+    const recentAnimeListData = await AnimeService.getRecentEpisodesAnime(
+      pageNumber
+    );
+    setRecentAnimeList(cleanAnimeList(recentAnimeListData));
+    setLoading(false);
+  }, []);
 
-  const handleNextPage = () => {
-    if (popularAnimeList?.hasNextPage) {
-      setPageNumber(prevState => prevState + 1);
-    }
-  }
-
-  const handlePrevPage = () => {
-    if (pageNumber > 1) {
-      setPageNumber(prevState => prevState - 1);
-    }
-  }
-
-  const handleSearch = (search: string) => {
-    setSearch(search.trim());
-    if (pageNumber > 1) {
-      setPageNumber(1);
-    }
+  const cleanAnimeList = (response: ResponseApiProps) => {
+    const animeIdList = response.results.map((anime) => anime.id);
+    const animeCleanedList = response.results.filter(
+      (anime: AnimeProps, index: number) =>
+        animeIdList.indexOf(anime.id) == index
+    );
+    return { ...response, results: animeCleanedList };
   };
 
-    return (
-      <Box>
-        <Navbar />
-        <Card sx={{ borderRadius: 0, p: 5 }}>
-        
-        <Box display='flex' alignItems='center' justifyContent='space-between' gap={5}>
-          <Typography variant="h4" fontWeight={500}>Animes Populares</Typography>
-          <TextField
-            label="Buscar..."
-            variant="standard"
-            onChange={event => handleSearch(event.target.value)}
-            />
-        </Box>
-
-          <Grid container mt={0} spacing={4}>
-          {popularAnimeList?.results && popularAnimeList?.results?.length > 0 ? popularAnimeList?.results.map(anime => (
-            <Grid item md={2.4} sm={4} xs={12} key={anime.id}>
-              <AnimeCard anime={anime} />
-            </Grid>
-          )) : (
-            <Grid item sm={12}>
-              <Typography>Nenhum anime encontrado!</Typography>
-            </Grid>
-          )}
-
-            <Grid item md={12} sm={12} xs={12}>
-              <Button onClick={handlePrevPage} disabled={pageNumber == 1}>Prev</Button>
-              <Button onClick={handleNextPage} disabled={!popularAnimeList?.hasNextPage}>Next</Button>
-            </Grid>
-          </Grid>
-        </Card>
-      </Box>
-    );
-}
+  return (
+    <Box width="100%">
+      {loading && (
+        <LinearProgress
+          sx={{ width: "100%", position: "fixed" }}
+          color="primary"
+        />
+      )}
+      <Navbar />
+      <Card
+        sx={{
+          borderRadius: 0,
+          display: "flex",
+          flexWrap: "wrap",
+          p: 5,
+          gap: 12,
+        }}
+      >
+        <AnimeGrid
+          title="Animes Populares"
+          animeData={popularAnimeList as ResponseApiProps}
+          getAnimeData={getAnimePopularData}
+        />
+        <AnimeGrid
+          title="Adicionados Recentemente"
+          animeData={recentAnimeList as ResponseApiProps}
+          getAnimeData={getAnimeRecentData}
+        />
+      </Card>
+    </Box>
+  );
+};
 
 export default HomeView;
