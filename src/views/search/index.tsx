@@ -77,6 +77,7 @@ const SearchView = () => {
           >
             <TextField
               fullWidth
+              autoFocus
               autoComplete="off"
               label="Pesquisar..."
               variant="standard"

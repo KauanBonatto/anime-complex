@@ -5,16 +5,18 @@ import AnimeEpisodeCard from "./AnimeEpisodeCard";
 
 const AnimeEpisodesGrid = ({
   loading,
+  title,
   animeInfo,
 }: {
   loading: boolean;
+  title?: string;
   animeInfo: AnimeInfoProps;
 }) => {
   const theme = useTheme();
 
   return (
     <Box width="100%">
-      <Box gap={5}>
+      <Box display="flex" flexDirection="column" gap={2}>
         <Typography
           variant="h4"
           fontWeight={500}
@@ -27,8 +29,18 @@ const AnimeEpisodesGrid = ({
             },
           }}
         >
-          {animeInfo.title}
+          {title ?? animeInfo.title}
         </Typography>
+        {/* <Typography
+          variant="h6"
+          fontWeight={400}
+          sx={{
+            userSelect: "none",
+            textAlign: "start",
+          }}
+        >
+          {animeInfo.description}
+        </Typography> */}
       </Box>
 
       <Grid container maxWidth="100%" m={0} spacing={4}>

@@ -44,3 +44,16 @@ interface AnimeInfoProps {
   totalEpisodes: number;
   episodes: AnimeEpisodeProps[];
 }
+
+interface AnimeEpisodeInfoProps {
+  headers: {
+    Referer: string;
+  };
+  sources: [
+    {
+      url: string;
+      quality: string;
+      isM3U8: true;
+    }
+  ];
+}

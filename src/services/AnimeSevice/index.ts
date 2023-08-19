@@ -35,7 +35,7 @@ class AnimeServiceClass {
 
   async getAnimeEpisodeByEpisodeId(
     episodeId: string
-  ): Promise<ResponseApiProps> {
+  ): Promise<AnimeEpisodeInfoProps> {
     const { data } = await apiService.get(`/watch/${episodeId}`);
     return data;
   }

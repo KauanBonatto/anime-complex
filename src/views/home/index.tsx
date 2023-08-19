@@ -10,12 +10,9 @@ import { useCallback, useState } from "react";
 
 const HomeView = () => {
   const [loading, setLoading] = useState(false);
-
   const [filters, setFilters] = useState<string[]>([]);
-
   const [popularAnimeList, setPopularAnimeList] =
     useState<ResponseApiProps | null>(null);
-
   const [recentAnimeList, setRecentAnimeList] =
     useState<ResponseApiProps | null>(null);
 
