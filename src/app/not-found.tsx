@@ -1,3 +1,4 @@
+import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { Box, Button, Card, Typography } from "@mui/material";
 import Link from "next/link";
@@ -28,6 +29,7 @@ const NotFound = () => {
           <Button variant="contained">Voltar</Button>
         </Link>
       </Card>
+      <Footer />
     </Box>
   );
 };

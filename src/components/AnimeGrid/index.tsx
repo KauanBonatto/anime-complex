@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
-import AnimeCard from "../AnimeCard";
+import AnimeCard from "./AnimeCard";
 
 const AnimeGrid = ({
   title,

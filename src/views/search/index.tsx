@@ -1,6 +1,7 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
+import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import AnimeService from "@/services/AnimeSevice";
 import {
@@ -104,6 +105,7 @@ const SearchView = () => {
           </Grid>
         )}
       </Card>
+      <Footer />
     </Box>
   );
 };

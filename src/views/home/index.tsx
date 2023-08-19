@@ -1,6 +1,7 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
+import Footer from "@/components/Footer";
 import GenderFilter from "@/components/GenderFilter";
 import Navbar from "@/components/Navbar";
 import AnimeService from "@/services/AnimeSevice";
@@ -97,6 +98,7 @@ const HomeView = () => {
           />
         </Box>
       </Card>
+      <Footer />
     </Box>
   );
 };
