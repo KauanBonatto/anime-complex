@@ -16,6 +16,13 @@ interface AnimeProps {
   subOrDub?: string;
 }
 
+interface AnimeGridProps {
+  title: string;
+  loading: boolean;
+  animeData: ResponseApiProps;
+  getAnimeData: (pageNumber: number) => Promise<void>;
+}
+
 interface AnimeEpisodeProps {
   id: string;
   number: number,

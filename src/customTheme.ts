@@ -17,31 +17,34 @@ const primary = {
 export const theme = createTheme({
   typography: {
     allVariants: {
-      color: primary[500]
+      color: primary[500],
     },
     fontFamily: [
-      '__Rubik_98e1b5',
-      'BlinkMacSystemFont',
+      "__Rubik_98e1b5",
+      "BlinkMacSystemFont",
       '"Segoe UI"',
-      'Roboto',
+      "Roboto",
       '"Helvetica Neue"',
-      'Arial',
-      'sans-serif',
-    ].join(',')
+      "Arial",
+      "sans-serif",
+    ].join(","),
   },
   palette: {
     text: {
-      primary: '#0e000f',
-      secondary: '#ffffff',
+      primary: "#0e000f",
+      secondary: "#ffffff",
     },
     background: {
-      default: '#3d0240',
-      paper: '#e6e6e6'
+      default: "#3d0240",
+      paper: "#e6e6e6",
+    },
+    action: {
+      active: "#ffffff",
     },
     primary,
     common: {
-      black: '#0e000f',
-      white: '#ffffff'
+      black: "#0e000f",
+      white: "#ffffff",
     },
-  }
-  });
+  },
+});

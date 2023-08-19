@@ -1,17 +1,22 @@
-import { Box, Button, Grid, Skeleton, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Grid,
+  Skeleton,
+  Typography,
+  useTheme,
+} from "@mui/material";
 import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
 import AnimeCard from "../AnimeCard";
 
 const AnimeGrid = ({
   title,
+  loading,
   animeData,
   getAnimeData,
-}: {
-  title: string;
-  animeData: ResponseApiProps;
-  getAnimeData: (pageNumber: number) => Promise<void>;
-}) => {
+}: AnimeGridProps) => {
+  const theme = useTheme();
   const [pageNumber, setPageNumber] = useState<number>(1);
 
   const handleNextPage = () => {
@@ -32,24 +37,36 @@ const AnimeGrid = ({
 
   return (
     <Box width="100%">
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        gap={5}
-      >
-        <Typography variant="h4" fontWeight={500}>
+      <Box gap={5}>
+        <Typography
+          variant="h4"
+          fontWeight={500}
+          sx={{
+            userSelect: "none",
+            textAlign: "start",
+            [theme.breakpoints.down("sm")]: {
+              fontSize: "1.6rem",
+              textAlign: "center",
+            },
+          }}
+        >
           {title}
         </Typography>
       </Box>
 
-      <Grid container m={0} spacing={4}>
-        {animeData?.results && animeData?.results?.length > 0 ? (
+      <Grid container maxWidth="100%" m={0} spacing={4}>
+        {!loading && animeData?.results && animeData?.results?.length > 0 ? (
           animeData?.results.map((anime, index) => (
             <Grid
               key={anime.id + index}
               item
-              sx={{ pl: "0px !important" }}
+              sx={{
+                pl: "0px !important",
+                [theme.breakpoints.up("xs")]: {
+                  display: "flex",
+                  justifyContent: "center",
+                },
+              }}
               xl={1.2}
               lg={2}
               md={2.4}
@@ -63,23 +80,34 @@ const AnimeGrid = ({
           ))
         ) : (
           <Fragment>
-            {["", "", "", "", "", "", "", "", "", ""].map((_, index) => (
-              <Grid
-                key={index}
-                item
-                sx={{ pl: "0px !important" }}
-                xl={1.2}
-                lg={2}
-                md={2.4}
-                sm={4}
-                xs={12}
-              >
-                <Box width={180}>
-                  <Skeleton variant="rounded" height={254} />
-                  <Skeleton variant="text" sx={{ mt: 0.5 }} />
-                </Box>
+            {animeData?.results?.length != 0 ? (
+              (
+                animeData?.results ?? ["", "", "", "", "", "", "", "", "", ""]
+              ).map((_, index) => (
+                <Grid
+                  key={index}
+                  item
+                  sx={{ pl: "0px !important" }}
+                  xl={1.2}
+                  lg={2}
+                  md={2.4}
+                  sm={4}
+                  xs={12}
+                >
+                  <Box width={180}>
+                    <Skeleton variant="rounded" height={254} />
+                    <Skeleton variant="text" sx={{ mt: 0.5 }} />
+                    <Skeleton variant="text" sx={{ width: "80%", mt: 0.5 }} />
+                  </Box>
+                </Grid>
+              ))
+            ) : (
+              <Grid item sx={{ pl: "0px !important" }}>
+                <Typography>
+                  Nenhum anime encontrado com os parâmetros informados!
+                </Typography>
               </Grid>
-            ))}
+            )}
           </Fragment>
         )}
 

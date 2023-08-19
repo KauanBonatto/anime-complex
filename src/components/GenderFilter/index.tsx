@@ -1,14 +1,11 @@
-import { Chip, Stack } from "@mui/material";
-import { useEffect } from "react";
+import { Chip, Grid, Typography } from "@mui/material";
 
 const GenderFilter = ({
   filters,
   setFilters,
-  filterAnimesList,
 }: {
   filters: string[];
   setFilters: React.Dispatch<React.SetStateAction<string[]>>;
-  filterAnimesList: () => Promise<void>;
 }) => {
   const filtersList = [
     { label: "Ação", value: "Action" },
@@ -17,7 +14,7 @@ const GenderFilter = ({
     { label: "Fantasia", value: "Fantasy" },
     { label: "Histórico", value: "Historical" },
     { label: "Comédia", value: "Comedy" },
-    { label: "Sobrevivencia", value: "Survival" },
+    { label: "Sobrevivência", value: "Survival" },
     { label: "Supernatural", value: "Supernatural" },
     { label: "Shounen", value: "Shounen" },
     { label: "Escolar", value: "School" },
@@ -25,37 +22,49 @@ const GenderFilter = ({
 
   const toggleChip = (filter: { label: string; value: string }) => {
     if (filters.includes(filter.value)) {
-      setFilters([]);
-      // setFilters((prevState) => {
-      //   const index = prevState.indexOf(filter.value);
-      //   if (index >= 0) {
-      //     prevState.splice(index, 1);
-      //     console.log(prevState);
-      //     return prevState;
-      //   }
-      //   return [];
-      // });
+      setFilters((prevState) => {
+        const newFilters = [...prevState];
+        const index = newFilters.indexOf(filter.value);
+        if (index >= 0) {
+          newFilters.splice(index, 1);
+          return newFilters;
+        }
+        return [];
+      });
     } else {
       setFilters((prevState) => [...prevState, filter.value]);
     }
   };
 
-  useEffect(() => {
-    filterAnimesList();
-  }, [filterAnimesList, filters]);
-
   return (
-    <Stack direction="row" spacing={1} mb={8}>
-      {filtersList.map((filter, index) => (
-        <Chip
-          key={filter.value + index}
-          label={filter.label}
-          color="primary"
-          variant={filters.includes(filter.value) ? "filled" : "outlined"}
-          onClick={() => toggleChip(filter)}
-        />
-      ))}
-    </Stack>
+    <Grid container>
+      <Typography fontWeight={500} sx={{ userSelect: "none" }}>
+        Gêneros
+      </Typography>
+      <Grid
+        item
+        display="flex"
+        flexWrap="wrap"
+        width="100%"
+        gap={1}
+        mt={1}
+        mb={8}
+      >
+        {filtersList.map((filter, index) => (
+          <Chip
+            key={filter.value + index}
+            sx={{
+              transition: ".5s",
+              border: (theme) => `1px solid ${theme.palette.primary.main}`,
+            }}
+            label={filter.label}
+            color="primary"
+            variant={filters.includes(filter.value) ? "filled" : "outlined"}
+            onClick={() => toggleChip(filter)}
+          />
+        ))}
+      </Grid>
+    </Grid>
   );
 };
 
