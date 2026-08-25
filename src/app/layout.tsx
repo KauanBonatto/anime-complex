@@ -21,6 +21,7 @@ export default function RootLayout({
       <head>
         <title>Anime Complex</title>
         <meta name="robots" content="noindex" />
+        <meta name="theme-color" content="#3d0240" />
         <link rel="icon" href="favicon.ico" type="image/x-icon" />
       </head>
       <body className={rubik.className}>

@@ -10,22 +10,24 @@ const AnimeCard = ({ anime }: { anime: AnimeProps }) => {
     <Paper
       elevation={0}
       sx={{
-        width: 180,
+        width: "100%",
         backgroundColor: "transparent",
         ":hover": {
           ".anime-image": { filter: "brightness(0.6)" },
         },
       }}
     >
-      <Box sx={{ position: "relative", width: 180, height: 254 }}>
+      <Box
+        sx={{ position: "relative", width: "100%", aspectRatio: "180 / 254" }}
+      >
         <Image
           className="anime-image"
           style={{ borderRadius: 8, transition: ".3s", objectFit: "cover" }}
           alt={anime.title}
           src={anime.image}
           draggable={false}
-          width={180}
-          height={254}
+          fill
+          sizes="(max-width: 600px) 45vw, (max-width: 900px) 30vw, 180px"
         />
         <AnimeScoreBadge score={anime.score} />
         {!!anime.episodeNumber && (
@@ -51,6 +53,7 @@ const AnimeCard = ({ anime }: { anime: AnimeProps }) => {
         fontWeight={500}
         title={anime.title}
         sx={{
+          mt: 1,
           display: "-webkit-box",
           WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical",
