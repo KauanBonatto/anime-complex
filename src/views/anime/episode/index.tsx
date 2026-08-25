@@ -1,85 +1,86 @@
 "use client";
 
 import AnimeEpisodesGrid from "@/components/AnimeEpisodesGrid";
+import EpisodePlayer from "@/components/EpisodePlayer";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
-import AnimeService from "@/services/AnimeSevice";
+import AnilistService from "@/services/AnilistService";
+import SugoiService from "@/services/SugoiService";
+import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import {
   Box,
+  Button,
   Card,
   Grid,
   LinearProgress,
   Skeleton,
   Typography,
 } from "@mui/material";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { notFound } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+
+/**
+ * Prioriza players sem anúncios e, entre eles, os embeds: os links diretos de
+ * vídeo vêm com token do CDN e costumam responder 401 fora do site de origem.
+ */
+const sortProviders = (providers: EpisodeProviderProps[]) =>
+  [...providers].sort(
+    (a, b) =>
+      Number(a.hasAds) - Number(b.hasAds) || Number(b.isEmbed) - Number(a.isEmbed)
+  );
 
 const AnimeEpisodeView = ({
   params,
 }: {
   params: { anime_id: string; episode_id: string };
 }) => {
+  const router = useRouter();
   const animeId = params.anime_id;
-  const episodeId = params.episode_id;
-  const [loading, setLoading] = useState(false);
-  const [animeInfo, setAnimeInfo] = useState<AnimeInfoProps | null>(null);
-  const [episodeInfo, setEpisodeInfo] = useState<AnimeEpisodeInfoProps | null>(
+  const episodeNumber = Number(params.episode_id);
+
+  const [loading, setLoading] = useState(true);
+  const [invalidEpisode, setInvalidEpisode] = useState(false);
+  const [animeDetails, setAnimeDetails] = useState<AnimeDetailsProps | null>(
     null
   );
+  const [providers, setProviders] = useState<EpisodeProviderProps[]>([]);
+  const [selectedProvider, setSelectedProvider] =
+    useState<EpisodeProviderProps | null>(null);
 
-  const episodeTitle = () => {
-    return episodeId.replaceAll("-", " ").replace(" episode", " - episode");
-  };
-
-  const getAnimeInfoData = useCallback(async () => {
+  const getEpisodeData = useCallback(async () => {
     setLoading(true);
-    const episodeInfoData = await AnimeService.getAnimeEpisodeByEpisodeId(
-      episodeId
-    );
-    if (!episodeInfoData) {
-      window.location.assign("/anime_not_found");
-    }
-    setEpisodeInfo(episodeInfoData);
+    setProviders([]);
+    setSelectedProvider(null);
 
-    const animeInfoData = await AnimeService.getAnimeInfo(animeId);
-    setAnimeInfo(animeInfoData as AnimeInfoProps);
-    setTimeout(() => setLoading(false), 600);
-  }, [animeId, episodeId]);
+    const animeDetailsData = await AnilistService.getAnimeDetails(animeId);
+    if (!animeDetailsData || !episodeNumber) {
+      setInvalidEpisode(true);
+      setLoading(false);
+      return;
+    }
+    setAnimeDetails(animeDetailsData);
+
+    const episodeProviders = sortProviders(
+      await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber)
+    );
+    setProviders(episodeProviders);
+    setSelectedProvider(episodeProviders[0] ?? null);
+    setLoading(false);
+  }, [animeId, episodeNumber]);
 
   useEffect(() => {
-    getAnimeInfoData();
-  }, [getAnimeInfoData]);
+    getEpisodeData();
+  }, [getEpisodeData]);
 
-  const filterAnimeInfo = (animeInfoData: AnimeInfoProps) => {
-    const animeEpisode = animeInfoData?.episodes?.find(
-      (episode: AnimeEpisodeProps) => {
-        return episode.id === episodeId;
-      }
-    );
+  if (invalidEpisode) notFound();
 
-    const animeListFiltered = animeInfoData?.episodes?.filter(
-      (episode: AnimeEpisodeProps) => {
-        const minEpisodeNumber =
-          Number(animeEpisode?.number ?? 0) <= 0
-            ? 1
-            : Number(animeEpisode?.number ?? 0) - 2;
-        const maxEpisodeNumber =
-          Number(animeEpisode?.number ?? 0) >= animeInfoData?.episodes?.length
-            ? animeInfoData?.episodes?.length
-            : Number(animeEpisode?.number ?? 0) + 2;
+  const goToEpisode = (nextEpisode: number) =>
+    router.push(`/anime/${animeId}/${nextEpisode}`);
 
-        if (
-          episode.number >= minEpisodeNumber &&
-          episode.number <= maxEpisodeNumber
-        )
-          return true;
-      }
-    );
-
-    console.log(animeListFiltered);
-
-    return { ...animeInfoData, episodes: animeListFiltered };
-  };
+  const hasNextEpisode =
+    !!animeDetails && episodeNumber < animeDetails.availableEpisodes;
 
   return (
     <Box width="100%">
@@ -98,59 +99,71 @@ const AnimeEpisodeView = ({
         }}
       >
         <Grid container>
-          <Grid item sm={12} gap={1} mt={1} mb={5}>
-            <Typography
-              variant="h4"
-              fontWeight={500}
-              sx={{
-                textTransform: "capitalize",
-                userSelect: "none",
-                textAlign: "start",
-              }}
-            >
-              {episodeTitle()}
+          <Grid item xs={12} mt={1} mb={4}>
+            <Typography variant="h4" fontWeight={500}>
+              {animeDetails?.title ?? <Skeleton sx={{ maxWidth: 380 }} />}
+            </Typography>
+            <Typography variant="h6" fontWeight={400} color="text.disabled">
+              Episódio {episodeNumber}
             </Typography>
           </Grid>
-          {loading && (
-            <Grid item sm={12} textAlign="center">
+
+          <Grid item xs={12} mb={4}>
+            {loading && (
               <Skeleton
                 variant="rounded"
                 sx={{
                   maxWidth: "100%",
-                  maxHeight: "calc(100vh - 100px)",
                   width: 900,
-                  height: 500,
+                  height: 506,
                   margin: "auto",
                 }}
               />
+            )}
+
+            {!loading && selectedProvider && (
+              <EpisodePlayer
+                providers={providers}
+                selectedProvider={selectedProvider}
+                onSelectProvider={setSelectedProvider}
+              />
+            )}
+
+            {!loading && !selectedProvider && (
+              <Typography>
+                Nenhum player encontrado para este episódio no SugoiAPI.
+                Verifique se a API local está rodando em{" "}
+                <code>http://localhost:1010</code>.
+              </Typography>
+            )}
+          </Grid>
+
+          <Grid item xs={12} display="flex" gap={2} mb={5}>
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackIosNewIcon />}
+              disabled={episodeNumber <= 1}
+              onClick={() => goToEpisode(episodeNumber - 1)}
+            >
+              Episódio anterior
+            </Button>
+            <Button
+              variant="outlined"
+              endIcon={<ArrowForwardIosIcon />}
+              disabled={!hasNextEpisode}
+              onClick={() => goToEpisode(episodeNumber + 1)}
+            >
+              Próximo episódio
+            </Button>
+          </Grid>
+
+          {animeDetails && (
+            <Grid item xs={12} mb={5}>
+              <AnimeEpisodesGrid
+                anime={animeDetails}
+                currentEpisode={episodeNumber}
+              />
             </Grid>
-          )}
-          {episodeInfo && (
-            <Fragment>
-              <Grid item sm={12} textAlign="center">
-                <iframe
-                  onLoad={() => setLoading(false)}
-                  allowFullScreen
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "calc(100vh - 100px)",
-                    width: 900,
-                    height: 600,
-                    border: "none",
-                  }}
-                  src={episodeInfo.headers.Referer}
-                ></iframe>
-              </Grid>
-              <Grid item sm={12} mb={6}>
-                {animeInfo && (
-                  <AnimeEpisodesGrid
-                    loading={loading}
-                    title="Another episodes"
-                    animeInfo={filterAnimeInfo(animeInfo)}
-                  />
-                )}
-              </Grid>
-            </Fragment>
           )}
         </Grid>
       </Card>

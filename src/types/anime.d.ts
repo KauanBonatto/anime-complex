@@ -1,0 +1,73 @@
+interface ResponseApiProps {
+  currentPage: number;
+  hasNextPage: boolean;
+  results: AnimeProps[];
+}
+
+interface AnimeProps {
+  id: string;
+  malId?: number | null;
+  episodeNumber?: number;
+  airedAt?: number | null;
+  title: string;
+  titleEnglish?: string | null;
+  image: string;
+  genres?: string[];
+  releaseDate?: string | null;
+  /** Nota média da comunidade, normalizada de 0 a 10. */
+  score?: number | null;
+  popularity?: number | null;
+  favourites?: number | null;
+  format?: string | null;
+  status?: string | null;
+  totalEpisodes?: number | null;
+}
+
+interface AnimeGridProps {
+  title: string;
+  loading: boolean;
+  animeData: ResponseApiProps;
+  getAnimeData: (pageNumber: number) => Promise<void>;
+  /** Muda sempre que os filtros mudam, para voltar à primeira página. */
+  resetToken?: string;
+  emptyMessage?: string;
+}
+
+/** Ficha completa vinda do AniList (dados + avaliação). */
+interface AnimeDetailsProps extends AnimeProps {
+  description: string | null;
+  bannerImage: string | null;
+  season: string | null;
+  seasonYear: number | null;
+  studios: string[];
+  siteUrl: string | null;
+  malUrl: string | null;
+  duration: number | null;
+  rankings: AnimeRankingProps[];
+  /** Episódios já exibidos, base para montar a lista de episódios. */
+  availableEpisodes: number;
+  /** Só existe em animes em exibição ou ainda não lançados. */
+  nextEpisode: NextEpisodeProps | null;
+}
+
+/** Próximo episódio agendado, com o horário em segundos (epoch). */
+interface NextEpisodeProps {
+  number: number;
+  airingAt: number;
+}
+
+/** Retorno do SugoiAPI: players encontrados para um episódio. */
+interface EpisodeProviderProps {
+  name: string;
+  slug: string;
+  hasAds: boolean;
+  isEmbed: boolean;
+  url: string;
+}
+
+interface AnimeRankingProps {
+  rank: number;
+  type: string;
+  context: string;
+  allTime: boolean;
+}

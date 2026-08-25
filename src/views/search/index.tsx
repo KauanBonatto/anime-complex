@@ -3,7 +3,7 @@
 import AnimeGrid from "@/components/AnimeGrid";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
-import AnimeService from "@/services/AnimeSevice";
+import AnilistService from "@/services/AnilistService";
 import {
   Box,
   Card,
@@ -26,24 +26,15 @@ const SearchView = () => {
   const getAnimeSearchedData = useCallback(
     async (pageNumber: number) => {
       setLoading(true);
-      const popularAnimeListData = await AnimeService.getAnimeBySearch(
+      const searchedListData = await AnilistService.getAnimeBySearch(
         debouncedSearch,
         pageNumber
       );
-      setSearchedList(cleanAnimeList(popularAnimeListData));
-      setTimeout(() => setLoading(false), 300);
+      setSearchedList(searchedListData);
+      setLoading(false);
     },
     [debouncedSearch]
   );
-
-  const cleanAnimeList = (response: ResponseApiProps) => {
-    const animeIdList = response?.results?.map((anime) => anime.id);
-    const animeCleanedList = response?.results?.filter(
-      (anime: AnimeProps, index: number) =>
-        animeIdList.indexOf(anime.id) == index
-    );
-    return { ...response, results: animeCleanedList };
-  };
 
   const handleSearch = (search: string) => {
     setSearch(search.trim());
@@ -96,6 +87,8 @@ const SearchView = () => {
             loading={loading}
             animeData={searchedList as ResponseApiProps}
             getAnimeData={getAnimeSearchedData}
+            resetToken={debouncedSearch}
+            emptyMessage={`Nenhum anime encontrado para "${debouncedSearch}".`}
           />
         ) : (
           <Grid item sx={{ pl: "0px !important" }}>

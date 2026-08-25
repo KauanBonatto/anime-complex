@@ -19,12 +19,16 @@ const FooterComponent = () => {
         }}
       >
         <Typography color="text.secondary">
-          Created using{" "}
+          Catálogo e avaliações via{" "}
+          <Link href="https://anilist.co" style={{ color: `#2196f3` }}>
+            AniList
+          </Link>
+          {" · "}Episódios via{" "}
           <Link
-            href="https://github.com/consumet/api.consumet.org"
+            href="https://github.com/yzPeedro/SugoiAPI"
             style={{ color: `#2196f3` }}
           >
-            api.consumet.org
+            SugoiAPI
           </Link>
         </Typography>
       </AppBar>

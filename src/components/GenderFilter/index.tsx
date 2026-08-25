@@ -1,3 +1,4 @@
+import { GENRE_LABELS } from "@/utils/anime";
 import { Chip, Grid, Typography } from "@mui/material";
 
 const GenderFilter = ({
@@ -7,18 +8,10 @@ const GenderFilter = ({
   filters: string[];
   setFilters: React.Dispatch<React.SetStateAction<string[]>>;
 }) => {
-  const filtersList = [
-    { label: "Ação", value: "Action" },
-    { label: "Aventura", value: "Adventure" },
-    { label: "Romance", value: "Romance" },
-    { label: "Fantasia", value: "Fantasy" },
-    { label: "Histórico", value: "Historical" },
-    { label: "Comédia", value: "Comedy" },
-    { label: "Sobrevivência", value: "Survival" },
-    { label: "Supernatural", value: "Supernatural" },
-    { label: "Shounen", value: "Shounen" },
-    { label: "Escolar", value: "School" },
-  ];
+  const filtersList = Object.entries(GENRE_LABELS).map(([value, label]) => ({
+    label,
+    value,
+  }));
 
   const toggleChip = (filter: { label: string; value: string }) => {
     if (filters.includes(filter.value)) {

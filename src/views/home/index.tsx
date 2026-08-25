@@ -4,56 +4,50 @@ import AnimeGrid from "@/components/AnimeGrid";
 import Footer from "@/components/Footer";
 import GenderFilter from "@/components/GenderFilter";
 import Navbar from "@/components/Navbar";
-import AnimeService from "@/services/AnimeSevice";
-import { Box, Card, LinearProgress } from "@mui/material";
+import AnilistService from "@/services/AnilistService";
+import { Box, Card, LinearProgress, Typography } from "@mui/material";
 import { useCallback, useState } from "react";
 
 const HomeView = () => {
-  const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<string[]>([]);
+  const [popularLoading, setPopularLoading] = useState(true);
+  const [recentLoading, setRecentLoading] = useState(true);
   const [popularAnimeList, setPopularAnimeList] =
     useState<ResponseApiProps | null>(null);
   const [recentAnimeList, setRecentAnimeList] =
     useState<ResponseApiProps | null>(null);
 
-  const getAnimePopularData = useCallback(async (pageNumber: number) => {
-    setLoading(true);
-    const popularAnimeListData = await AnimeService.getTopAiringAnime(
-      pageNumber
-    );
-    setPopularAnimeList(cleanAnimeList(popularAnimeListData));
-    setTimeout(() => setLoading(false), 300);
-  }, []);
+  const getAnimePopularData = useCallback(
+    async (pageNumber: number) => {
+      setPopularLoading(true);
+      const popularAnimeListData = await AnilistService.getPopularAnime(
+        pageNumber,
+        filters
+      );
+      setPopularAnimeList(popularAnimeListData);
+      setPopularLoading(false);
+    },
+    [filters]
+  );
 
-  const getAnimeRecentData = useCallback(async (pageNumber: number) => {
-    setLoading(true);
-    const recentAnimeListData = await AnimeService.getRecentEpisodesAnime(
-      pageNumber
-    );
-    setRecentAnimeList(cleanAnimeList(recentAnimeListData));
-    setTimeout(() => setLoading(false), 300);
-  }, []);
+  const getAnimeRecentData = useCallback(
+    async (pageNumber: number) => {
+      setRecentLoading(true);
+      const recentAnimeListData = await AnilistService.getRecentAnime(
+        pageNumber,
+        filters
+      );
+      setRecentAnimeList(recentAnimeListData);
+      setRecentLoading(false);
+    },
+    [filters]
+  );
 
-  const cleanAnimeList = (response: ResponseApiProps) => {
-    const animeIdList = response.results.map((anime) => anime.id);
-    const animeCleanedList = response.results.filter(
-      (anime: AnimeProps, index: number) =>
-        animeIdList.indexOf(anime.id) == index
-    );
-    return { ...response, results: animeCleanedList };
-  };
-
-  const filterAnimesList = (animeData: ResponseApiProps, filters: string[]) => {
-    if (!filters) return animeData;
-    const animeListFiltered = animeData?.results.filter((anime: AnimeProps) => {
-      return filters.every((genre) => anime.genres?.includes(genre));
-    });
-    return { ...animeData, results: animeListFiltered };
-  };
+  const filtersToken = filters.join(",");
 
   return (
     <Box width="100%">
-      {loading && (
+      {(popularLoading || recentLoading) && (
         <LinearProgress
           sx={{ width: "100%", position: "fixed" }}
           color="primary"
@@ -77,23 +71,27 @@ const HomeView = () => {
         >
           <AnimeGrid
             title="Animes Populares"
-            loading={loading}
-            animeData={filterAnimesList(
-              popularAnimeList as ResponseApiProps,
-              filters
-            )}
+            loading={popularLoading}
+            animeData={popularAnimeList as ResponseApiProps}
             getAnimeData={getAnimePopularData}
+            resetToken={filtersToken}
           />
           <AnimeGrid
-            title="Adicionados Recentemente"
-            loading={loading}
-            animeData={filterAnimesList(
-              recentAnimeList as ResponseApiProps,
-              filters
-            )}
+            title={filters.length ? "Em Exibição" : "Episódios Recentes"}
+            loading={recentLoading}
+            animeData={recentAnimeList as ResponseApiProps}
             getAnimeData={getAnimeRecentData}
+            resetToken={filtersToken}
           />
         </Box>
+        <Typography
+          variant="caption"
+          color="text.disabled"
+          display="block"
+          mt={6}
+        >
+          Catálogo e avaliações fornecidos pelo AniList.
+        </Typography>
       </Card>
       <Footer />
     </Box>
