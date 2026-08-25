@@ -1,5 +1,28 @@
-import { getPtBrSynopsis } from "@/services/TmdbService/server";
+import {
+  getPtBrSynopsis,
+  type SynopsisResult,
+} from "@/services/TmdbService/server";
+import { ONE_DAY, createCache } from "@/utils/cache";
 import { NextResponse } from "next/server";
+
+/**
+ * O texto da sinopse não muda, então a resposta pode ficar guardada por um dia
+ * inteiro — no processo do servidor, para atender todos os visitantes sem
+ * repetir a busca no TMDB, e no browser/CDN pelo Cache-Control.
+ */
+const SYNOPSIS_TTL = ONE_DAY;
+
+const synopsisCache = createCache<SynopsisResult>({
+  namespace: "synopsis",
+  ttl: SYNOPSIS_TTL,
+  maxEntries: 500,
+});
+
+const CACHE_HEADERS = {
+  "Cache-Control": `public, max-age=${SYNOPSIS_TTL / 1000}, s-maxage=${
+    SYNOPSIS_TTL / 1000
+  }, stale-while-revalidate=${SYNOPSIS_TTL / 1000}`,
+};
 
 /**
  * Sinopse em pt-BR de um anime. A busca acontece aqui porque a chave do TMDB é
@@ -15,7 +38,7 @@ export async function GET(
 ) {
   const anilistId = Number(params.anime_id);
   if (!anilistId) {
-    return NextResponse.json({ description: null, source: null });
+    return NextResponse.json({ description: null, title: null, source: null });
   }
 
   const search = new URL(request.url).searchParams;
@@ -23,13 +46,15 @@ export async function GET(
     (title): title is string => !!title?.trim()
   );
   const year = Number(search.get("year")) || null;
+  const format = search.get("format");
+  const uniqueTitles = Array.from(new Set(titles));
 
-  const synopsis = await getPtBrSynopsis({
-    anilistId,
-    titles: Array.from(new Set(titles)),
-    year,
-    format: search.get("format"),
-  });
+  const synopsis = await synopsisCache.resolve(
+    String(anilistId),
+    () => getPtBrSynopsis({ anilistId, titles: uniqueTitles, year, format }),
+    // Sem sinopse pode ser o TMDB fora do ar; tentamos de novo na próxima.
+    { shouldStore: (result) => !!result.description }
+  );
 
-  return NextResponse.json(synopsis);
+  return NextResponse.json(synopsis, { headers: CACHE_HEADERS });
 }

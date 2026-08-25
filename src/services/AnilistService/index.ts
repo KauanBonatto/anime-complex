@@ -7,6 +7,7 @@ import {
   SEARCH_ANIME_QUERY,
 } from "./queries";
 import { AnilistMedia, AnilistPage } from "./types";
+import { ONE_HOUR, createCache } from "@/utils/cache";
 
 const anilistApi = axios.create({
   baseURL: "https://graphql.anilist.co",
@@ -26,7 +27,43 @@ const PER_PAGE = 24;
  */
 const AIRING_WINDOW_PAGE_SIZE = 50;
 const AIRING_WINDOW_PAGES = 3;
-const AIRING_WINDOW_TTL = 5 * 60 * 1000;
+
+/**
+ * Catálogo e fichas mudam devagar — uma temporada nova por trimestre, notas
+ * que oscilam em casas decimais. Uma hora de cache deixa a navegação
+ * instantânea e mantém o consumo do rate limit do AniList (90 requisições por
+ * minuto por IP) bem longe do teto.
+ */
+const LIST_TTL = ONE_HOUR;
+
+/** Listas paginadas: populares, recentes e buscas. */
+const listCache = createCache<ResponseApiProps>({
+  namespace: "anilist:list",
+  ttl: LIST_TTL,
+  persist: true,
+});
+
+/** Fichas completas, usadas pela página do anime e pela do episódio. */
+const detailsCache = createCache<AnimeDetailsProps | null>({
+  namespace: "anilist:details",
+  ttl: LIST_TTL,
+  persist: true,
+});
+
+/**
+ * A janela de episódios recentes é grande (150 registros) e alimenta todas as
+ * páginas da lista, então fica só em memória para não ocupar o storage.
+ */
+const airingWindowCache = createCache<AnimeProps[]>({
+  namespace: "anilist:airing-window",
+  ttl: LIST_TTL,
+  maxEntries: 1,
+});
+
+const AIRING_WINDOW_KEY = "current";
+
+/** Chave estável: a ordem dos gêneros escolhidos não pode mudar o cache. */
+const genresKey = (genres: string[]) => [...genres].sort().join(",");
 
 const DEFAULT_COVER =
   "https://s4.anilist.co/file/anilistcdn/media/anime/cover/default.jpg";
@@ -56,11 +93,14 @@ class AnilistServiceClass {
     page: number = 1,
     genres: string[] = []
   ): Promise<ResponseApiProps> {
-    const data = await this.request<{ Page: AnilistPage }>(
-      POPULAR_ANIME_QUERY,
-      { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined }
-    );
-    return this.toResponse(data?.Page, page);
+    const key = `popular:${page}:${genresKey(genres)}`;
+    return this.cachedList(key, async () => {
+      const data = await this.request<{ Page: AnilistPage }>(
+        POPULAR_ANIME_QUERY,
+        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined }
+      );
+      return this.toResponse(data?.Page, page);
+    });
   }
 
   /**
@@ -73,11 +113,14 @@ class AnilistServiceClass {
     genres: string[] = []
   ): Promise<ResponseApiProps> {
     if (genres.length) {
-      const data = await this.request<{ Page: AnilistPage }>(
-        RECENT_ANIME_QUERY,
-        { page, perPage: PER_PAGE, genres }
-      );
-      return this.toResponse(data?.Page, page);
+      const key = `recent:${page}:${genresKey(genres)}`;
+      return this.cachedList(key, async () => {
+        const data = await this.request<{ Page: AnilistPage }>(
+          RECENT_ANIME_QUERY,
+          { page, perPage: PER_PAGE, genres }
+        );
+        return this.toResponse(data?.Page, page);
+      });
     }
 
     const window = await this.getRecentEpisodesWindow();
@@ -91,25 +134,13 @@ class AnilistServiceClass {
     };
   }
 
-  private recentEpisodesWindow: {
-    fetchedAt: number;
-    results: AnimeProps[];
-  } | null = null;
-
-  private pendingWindow: Promise<AnimeProps[]> | null = null;
-
   /** Janela de episódios recentes já ordenada por popularidade, com cache. */
   private async getRecentEpisodesWindow(): Promise<AnimeProps[]> {
-    const cache = this.recentEpisodesWindow;
-    if (cache && Date.now() - cache.fetchedAt < AIRING_WINDOW_TTL) {
-      return cache.results;
-    }
-    if (this.pendingWindow) return this.pendingWindow;
-
-    this.pendingWindow = this.fetchRecentEpisodesWindow().finally(() => {
-      this.pendingWindow = null;
-    });
-    return this.pendingWindow;
+    return airingWindowCache.resolve(
+      AIRING_WINDOW_KEY,
+      () => this.fetchRecentEpisodesWindow(),
+      { shouldStore: (episodes) => episodes.length > 0 }
+    );
   }
 
   private async fetchRecentEpisodesWindow(): Promise<AnimeProps[]> {
@@ -133,11 +164,7 @@ class AnilistServiceClass {
         airedAt: schedule.airingAt,
       }));
 
-    const window = this.sortByPopularity(this.dedupe(results));
-    if (window.length) {
-      this.recentEpisodesWindow = { fetchedAt: Date.now(), results: window };
-    }
-    return window;
+    return this.sortByPopularity(this.dedupe(results));
   }
 
   async getAnimeBySearch(
@@ -145,14 +172,22 @@ class AnilistServiceClass {
     page: number = 1,
     genres: string[] = []
   ): Promise<ResponseApiProps> {
-    if (!search.trim()) return EMPTY_RESPONSE;
-    const data = await this.request<{ Page: AnilistPage }>(SEARCH_ANIME_QUERY, {
-      page,
-      perPage: PER_PAGE,
-      search: search.trim(),
-      genres: genres.length ? genres : undefined,
+    const term = search.trim();
+    if (!term) return EMPTY_RESPONSE;
+
+    const key = `search:${term.toLowerCase()}:${page}:${genresKey(genres)}`;
+    return this.cachedList(key, async () => {
+      const data = await this.request<{ Page: AnilistPage }>(
+        SEARCH_ANIME_QUERY,
+        {
+          page,
+          perPage: PER_PAGE,
+          search: term,
+          genres: genres.length ? genres : undefined,
+        }
+      );
+      return this.toResponse(data?.Page, page);
     });
-    return this.toResponse(data?.Page, page);
   }
 
   async getAnimeDetails(
@@ -161,6 +196,17 @@ class AnilistServiceClass {
     const id = Number(anilistId);
     if (!id) return null;
 
+    return detailsCache.resolve(
+      `details:${id}`,
+      () => this.fetchAnimeDetails(id),
+      // Uma falha de rede não pode esconder o anime pela hora seguinte.
+      { shouldStore: (details) => details !== null }
+    );
+  }
+
+  private async fetchAnimeDetails(
+    id: number
+  ): Promise<AnimeDetailsProps | null> {
     const data = await this.request<{ Media: AnilistMedia }>(
       ANIME_DETAILS_QUERY,
       { id }
@@ -184,6 +230,20 @@ class AnilistServiceClass {
       availableEpisodes: this.toAvailableEpisodes(media),
       nextEpisode: this.toNextEpisode(media),
     };
+  }
+
+  /**
+   * Só guardamos listas que vieram com resultados: uma resposta vazia costuma
+   * ser erro de rede ou rate limit, e cachear isso deixaria a tela vazia pela
+   * hora seguinte.
+   */
+  private cachedList(
+    key: string,
+    loader: () => Promise<ResponseApiProps>
+  ): Promise<ResponseApiProps> {
+    return listCache.resolve(key, loader, {
+      shouldStore: (response) => response.results.length > 0,
+    });
   }
 
   private toResponse(
