@@ -94,8 +94,6 @@ interface EpisodeProviderProps {
   isEmbed: boolean;
   /** Playlist HLS, que precisa do hls.js fora do Safari. */
   isHls?: boolean;
-  /** Player que se recusa a rodar em iframe com `sandbox`. */
-  refusesSandbox?: boolean;
   url: string;
 }
 

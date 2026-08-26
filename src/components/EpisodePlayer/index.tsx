@@ -20,10 +20,6 @@ const PLAYER_STYLE = {
  * Alguns providers injetam anúncios que chamam `top.location` e arrastam a aba
  * inteira para o site deles depois de alguns segundos. Sem `allow-top-navigation`
  * o embed fica preso dentro do iframe e o player continua funcionando normalmente.
- *
- * Uns poucos detectam o sandbox e se recusam a tocar dentro dele. Para esses não
- * há meio-termo — a flag que eles testam é ligada pela presença do atributo, não
- * pelos tokens —, então a escolha é entre abrir mão da trava ou do player.
  */
 const PLAYER_SANDBOX = [
   "allow-scripts",
@@ -86,9 +82,7 @@ const EpisodePlayer = ({
         <iframe
           key={selectedProvider.url}
           allowFullScreen
-          sandbox={
-            selectedProvider.refusesSandbox ? undefined : PLAYER_SANDBOX
-          }
+          sandbox={PLAYER_SANDBOX}
           allow={PLAYER_PERMISSIONS}
           referrerPolicy="origin-when-cross-origin"
           title={`Player do ${selectedProvider.name}`}
