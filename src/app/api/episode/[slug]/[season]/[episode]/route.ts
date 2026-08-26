@@ -65,31 +65,38 @@ interface SugoiProvider {
 }
 
 /**
- * O Top Animes não devolve um player, e sim uma página que embrulha o vídeo. Há
- * três formatos no ar hoje:
+ * O Top Animes não devolve um player, e sim uma página que embrulha o vídeo, e
+ * cada episódio pode vir num formato diferente. Há quatro no ar hoje.
+ *
+ * Dois escondem a playlist e só o servidor consegue chegar nela, então passam
+ * pelo /api/stream:
  *
  * - `/antivirus…`: checa o `document.referrer` e, fora do domínio deles, troca
  *   o próprio endereço pela home — era o que engolia o vídeo no nosso iframe;
- * - `sk-api.alibabacdn.net`: busca as fontes com `mode=api2` e monta o player;
- * - `/aviso/?url=…`: só uma sala de espera na frente do player de terceiros.
- *
- * Os dois primeiros o /api/stream resolve e devolve como playlist HLS. O
- * terceiro a gente desembrulha e usa o embed que está lá dentro.
+ * - `sk-api.alibabacdn.net`: busca as fontes com `mode=api2`, de uma origem que
+ *   não libera CORS para nós.
  */
-const WRAPPED_PLAYERS = [
-  "topanimes.net/antivirus",
-  "sk-api.alibabacdn.net",
-];
+const WRAPPED_PLAYERS = ["topanimes.net/antivirus", "sk-api.alibabacdn.net"];
+
+/**
+ * Os outros dois carregam o endereço real no próprio link, então basta abrir o
+ * embrulho: `/aviso/?url=` é uma sala de espera na frente de um player de
+ * terceiros, e `videohls.php?d=` é uma tela de anúncios na frente de um m3u8.
+ */
+const WRAPPER_PARAMS: Record<string, string> = {
+  "topanimes.net/aviso": "url",
+  "anivideo.net/videohls": "d",
+};
 
 const isWrappedPlayer = (url: string) =>
   WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
 
-/** Tira o embed de dentro da página de aviso, quando é só isso que ela faz. */
-const unwrapNotice = (url: string) => {
-  if (!url.includes("topanimes.net/aviso")) return url;
+const unwrapPlayer = (url: string) => {
+  const wrapper = Object.keys(WRAPPER_PARAMS).find((key) => url.includes(key));
+  if (!wrapper) return url;
 
   try {
-    return new URL(url).searchParams.get("url") ?? url;
+    return new URL(url).searchParams.get(WRAPPER_PARAMS[wrapper]) ?? url;
   } catch {
     return url;
   }
@@ -101,16 +108,18 @@ const toProviders = (data: SugoiProvider[] = []): EpisodeProviderProps[] =>
     (provider.episodes ?? [])
       .filter((episode) => !episode.error && !!episode.episode)
       .map((episode) => {
-        const url = unwrapNotice(episode.episode as string);
+        const url = unwrapPlayer(episode.episode as string);
         const proxied = isWrappedPlayer(url);
+        // Playlist que o browser alcança sozinho, sem intermédio nenhum.
+        const direct = url.includes(".m3u8");
 
         return {
           name: provider.name,
           slug: provider.slug,
           hasAds: provider.has_ads,
           // Deixa de ser embed: agora é uma playlist tocada no nosso player.
-          isEmbed: provider.is_embed && !proxied,
-          isHls: proxied,
+          isEmbed: provider.is_embed && !proxied && !direct,
+          isHls: proxied || direct,
           url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
         };
       })
