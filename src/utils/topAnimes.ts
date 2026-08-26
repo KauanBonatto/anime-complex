@@ -68,6 +68,31 @@ export interface TopAnimesPlayer {
   url: string;
 }
 
+const PROBE_TIMEOUT = 6_000;
+
+/**
+ * Vários embeds da lista apontam para arquivos que já saíram do ar. Uns poucos
+ * hosts dizem isso no próprio status, e esses dá para tirar da lista antes de
+ * virarem um botão que só mostra "404" ao usuário.
+ *
+ * O teste é de propósito conservador: quem responde qualquer outra coisa fica.
+ * A maioria dos players é uma página que só descobre a falta do arquivo depois
+ * de rodar o JS, e não é papel deste fetch adivinhar o que ela vai concluir.
+ */
+const isGone = async (url: string) => {
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT),
+      headers: { "User-Agent": BROWSER_UA },
+    });
+    return response.status === 404 || response.status === 410;
+  } catch (err) {
+    // Timeout ou host fora do ar não provam nada sobre o arquivo.
+    return false;
+  }
+};
+
 export const listEpisodePlayers = async (
   episodePage: string
 ): Promise<TopAnimesPlayer[]> => {
@@ -87,10 +112,21 @@ export const listEpisodePlayers = async (
     ])
   );
 
-  return Array.from(html.matchAll(PLAYER_BOX))
+  const players = Array.from(html.matchAll(PLAYER_BOX))
     .map(([, nume, box]) => ({
       label: labels.get(nume) || null,
       url: EMBED_SRC.exec(box)?.[1] ?? "",
     }))
     .filter(({ url }) => !!url && !isOfflinePlayer(url));
+
+  // Os embrulhos que o /api/stream resolve ficam de fora do teste: quem
+  // responde por eles é a página do player, não o endereço em si.
+  const gone = await Promise.all(
+    players.map(({ url }) => {
+      const embed = unwrapPlayer(url);
+      return isWrappedPlayer(embed) ? false : isGone(embed);
+    })
+  );
+
+  return players.filter((_, index) => !gone[index]);
 };
