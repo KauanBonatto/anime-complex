@@ -48,6 +48,8 @@ interface AnimeDetailsProps extends AnimeProps {
   trailer: AnimeTrailerProps | null;
   /** Onde assistir oficialmente na Crunchyroll, quando o anime está lá. */
   crunchyroll: CrunchyrollProps | null;
+  /** Título de cada episódio que o AniList conhece, por número. */
+  episodeTitles: Record<number, string>;
   /** Episódios já exibidos, base para montar a lista de episódios. */
   availableEpisodes: number;
   /** Só existe em animes em exibição ou ainda não lançados. */

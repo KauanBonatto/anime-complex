@@ -9,17 +9,11 @@ const CRUNCHYROLL_ORANGE = "#f47521";
  * `target="_blank"`: sem ele a página aberta ganha acesso a esta pela
  * `window.opener`.
  */
-const CrunchyrollChip = ({
-  link,
-  episodeNumber,
-}: {
-  link: CrunchyrollLinkProps;
-  episodeNumber: number;
-}) => (
+const CrunchyrollChip = ({ link }: { link: CrunchyrollLinkProps }) => (
   <Tooltip
     title={
       link.isEpisode
-        ? `Assistir o episódio na Crunchyroll`
+        ? "Assistir o episódio na Crunchyroll"
         : "Abrir anime na Crunchyroll"
     }
   >

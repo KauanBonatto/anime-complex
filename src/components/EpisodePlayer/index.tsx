@@ -38,13 +38,11 @@ const EpisodePlayer = ({
   providers,
   selectedProvider,
   onSelectProvider,
-  episodeNumber,
   crunchyroll,
 }: {
   providers: EpisodeProviderProps[];
   selectedProvider: EpisodeProviderProps;
   onSelectProvider: (provider: EpisodeProviderProps) => void;
-  episodeNumber: number;
   /** Link oficial da Crunchyroll, quando o anime está no catálogo dela. */
   crunchyroll?: CrunchyrollLinkProps | null;
 }) => {
@@ -121,9 +119,7 @@ const EpisodePlayer = ({
             );
           })}
 
-          {crunchyroll && (
-            <CrunchyrollChip link={crunchyroll} episodeNumber={episodeNumber} />
-          )}
+          {crunchyroll && <CrunchyrollChip link={crunchyroll} />}
         </Stack>
       </Stack>
     </Box>

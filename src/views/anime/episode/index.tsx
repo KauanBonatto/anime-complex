@@ -91,6 +91,8 @@ const AnimeEpisodeView = ({
     episodeNumber,
   );
 
+  const episodeTitle = animeDetails?.episodeTitles?.[episodeNumber];
+
   return (
     <Box width="100%">
       {loading && (
@@ -114,6 +116,7 @@ const AnimeEpisodeView = ({
             </Typography>
             <Typography variant="h6" fontWeight={400} color="text.disabled">
               Episódio {episodeNumber}
+              {episodeTitle && ` - ${episodeTitle}`}
             </Typography>
           </Grid>
 
@@ -135,7 +138,6 @@ const AnimeEpisodeView = ({
                 providers={providers}
                 selectedProvider={selectedProvider}
                 onSelectProvider={setSelectedProvider}
-                episodeNumber={episodeNumber}
                 crunchyroll={crunchyrollLink}
               />
             )}
@@ -145,12 +147,7 @@ const AnimeEpisodeView = ({
                 <Typography>
                   Nenhum player encontrado para este episódio.
                 </Typography>
-                {crunchyrollLink && (
-                  <CrunchyrollChip
-                    link={crunchyrollLink}
-                    episodeNumber={episodeNumber}
-                  />
-                )}
+                {crunchyrollLink && <CrunchyrollChip link={crunchyrollLink} />}
               </Stack>
             )}
           </Grid>

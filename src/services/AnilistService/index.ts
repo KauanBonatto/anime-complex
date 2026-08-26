@@ -47,7 +47,7 @@ const listCache = createCache<ResponseApiProps>({
 const detailsCache = createCache<AnimeDetailsProps | null>({
   // O sufixo muda junto com o formato da ficha: fichas guardadas antes de um
   // campo novo existir seguiriam válidas por uma hora, sem ele.
-  namespace: "anilist:details:v2",
+  namespace: "anilist:details:v3",
   ttl: LIST_TTL,
   persist: true,
 });
@@ -231,6 +231,7 @@ class AnilistServiceClass {
       rankings: media.rankings ?? [],
       trailer: this.toTrailer(media),
       crunchyroll: this.toCrunchyroll(media),
+      episodeTitles: this.toEpisodeTitles(media),
       availableEpisodes: this.toAvailableEpisodes(media),
       nextEpisode: this.toNextEpisode(media),
     };
@@ -350,7 +351,7 @@ class AnilistServiceClass {
     for (const episode of media.streamingEpisodes ?? []) {
       if (!isCrunchyroll(episode.site) || !episode.url) continue;
 
-      const number = this.toStreamingEpisodeNumber(episode.title);
+      const number = this.parseStreamingEpisode(episode.title)?.number;
       // O primeiro link vence: episódios repetidos costumam ser dublagens.
       if (number && !episodeUrls[number]) {
         episodeUrls[number] = this.toSecureUrl(episode.url);
@@ -366,10 +367,39 @@ class AnilistServiceClass {
     return { seriesUrl, episodeUrls };
   }
 
-  /** "Episode 12 - Title" -> 12. Sem número reconhecível, devolve null. */
-  private toStreamingEpisodeNumber(title?: string | null): number | null {
-    const match = title?.match(/(?:epis[oó]dio|episode|ep\.?)\s*0*(\d+)/i);
-    return match ? Number(match[1]) : null;
+  /**
+   * "Episode 12 - Título" -> { number: 12, title: "Título" }. O AniList escreve
+   * o rótulo assim tanto nos links da Crunchyroll quanto nos dos outros
+   * serviços; sem número reconhecível a entrada é descartada.
+   */
+  private parseStreamingEpisode(
+    label?: string | null
+  ): { number: number; title: string | null } | null {
+    const match = label?.match(
+      /(?:epis[oó]dio|episode|ep\.?)\s*0*(\d+)\s*(?:[-–—:]\s*(.+))?$/i
+    );
+    if (!match) return null;
+
+    return { number: Number(match[1]), title: match[2]?.trim() || null };
+  }
+
+  /**
+   * Títulos dos episódios, aceitando qualquer serviço de streaming: o texto é
+   * o mesmo em todos e o que interessa aqui é a cobertura. O AniList só
+   * cadastra uma janela de episódios das séries longas, então o título nem
+   * sempre existe — a página cai só no número quando falta.
+   */
+  private toEpisodeTitles(media: AnilistMedia): Record<number, string> {
+    const titles: Record<number, string> = {};
+
+    for (const episode of media.streamingEpisodes ?? []) {
+      const parsed = this.parseStreamingEpisode(episode.title);
+      if (parsed?.title && !titles[parsed.number]) {
+        titles[parsed.number] = parsed.title;
+      }
+    }
+
+    return titles;
   }
 
   /** O AniList ainda guarda vários links da Crunchyroll em http. */
