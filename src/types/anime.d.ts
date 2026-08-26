@@ -94,6 +94,8 @@ interface EpisodeProviderProps {
   isEmbed: boolean;
   /** Playlist HLS, que precisa do hls.js fora do Safari. */
   isHls?: boolean;
+  /** Player que só libera o vídeo quando não sabe de onde está sendo aberto. */
+  hideReferrer?: boolean;
   url: string;
 }
 

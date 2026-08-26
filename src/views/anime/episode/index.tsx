@@ -32,6 +32,20 @@ import { useCallback, useEffect, useState } from "react";
 const isHosted = (provider: EpisodeProviderProps) =>
   provider.isEmbed || !!provider.isHls;
 
+/**
+ * Players que, nos testes, quase nunca tinham o episódio pedido: ficam fora da
+ * lista para não virarem um botão que só leva a uma tela de erro.
+ */
+const HIDDEN_PLAYERS = [
+  "anime fire",
+  "top animes (aniplay)",
+  "top animes (chplay)",
+  "top animes (noads)",
+];
+
+const isHidden = ({ name }: EpisodeProviderProps) =>
+  HIDDEN_PLAYERS.includes(name.trim().replace(/\s+/g, " ").toLowerCase());
+
 const sortProviders = (providers: EpisodeProviderProps[]) =>
   [...providers].sort(
     (a, b) =>
@@ -71,7 +85,9 @@ const AnimeEpisodeView = ({
     setAnimeDetails(animeDetailsData);
 
     const episodeProviders = sortProviders(
-      await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),
+      (
+        await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber)
+      ).filter((provider) => !isHidden(provider)),
     );
     setProviders(episodeProviders);
     setSelectedProvider(episodeProviders[0] ?? null);

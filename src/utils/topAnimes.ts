@@ -25,6 +25,18 @@ const WRAPPER_PARAMS: Record<string, string> = {
 /** E o quinto avisa que aquele player caiu, sem vídeo nenhum atrás. */
 const OFFLINE_PLAYER = "topanimes.net/off";
 
+/**
+ * O filemoon declara ao próprio servidor quem está embutindo o vídeo, num
+ * cabeçalho `X-Embed-Origin` montado a partir do `document.referrer` do iframe,
+ * e o servidor só libera os domínios que o dono do arquivo autorizou. Sem
+ * referrer não há origem a declarar, que é o mesmo caso de abrir o player numa
+ * aba — o único caminho que nos resta, já que o nosso domínio não está lá.
+ */
+const REFERRER_BLOCKED = ["filemoon.sx"];
+
+export const hidesReferrer = (url: string) =>
+  REFERRER_BLOCKED.some((host) => url.includes(host));
+
 export const isWrappedPlayer = (url: string) =>
   WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
 
