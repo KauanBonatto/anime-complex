@@ -16,6 +16,20 @@ const PLAYER_STYLE = {
 };
 
 /**
+ * Alguns providers injetam anúncios que chamam `top.location` e arrastam a aba
+ * inteira para o site deles depois de alguns segundos. Sem `allow-top-navigation`
+ * o embed fica preso dentro do iframe e o player continua funcionando normalmente.
+ */
+const PLAYER_SANDBOX = [
+  "allow-scripts",
+  "allow-same-origin",
+  "allow-presentation",
+].join(" ");
+
+const PLAYER_PERMISSIONS =
+  "autoplay; fullscreen; encrypted-media; picture-in-picture";
+
+/**
  * O mesmo provider pode devolver mais de um link para o episódio, então as
  * repetições ganham um número para o usuário conseguir diferenciar as opções.
  */
@@ -60,6 +74,10 @@ const EpisodePlayer = ({
         <iframe
           key={selectedProvider.url}
           allowFullScreen
+          sandbox={PLAYER_SANDBOX}
+          allow={PLAYER_PERMISSIONS}
+          referrerPolicy="origin-when-cross-origin"
+          title={`Player do ${selectedProvider.name}`}
           style={PLAYER_STYLE}
           src={selectedProvider.url}
         />
