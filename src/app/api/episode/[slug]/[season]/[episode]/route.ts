@@ -88,8 +88,19 @@ const WRAPPER_PARAMS: Record<string, string> = {
   "anivideo.net/videohls": "d",
 };
 
+/**
+ * Estes players testam `document.domain = document.domain` e se recusam a tocar
+ * quando a atribuição falha. O erro vem da flag de sandbox, que o atributo liga
+ * por existir — nenhum token `allow-` a desliga —, então ou eles rodam sem
+ * sandbox ou não rodam.
+ */
+const SANDBOX_REFUSERS = ["strp2p.com"];
+
 const isWrappedPlayer = (url: string) =>
   WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
+
+const refusesSandbox = (url: string) =>
+  SANDBOX_REFUSERS.some((host) => url.includes(host));
 
 const unwrapPlayer = (url: string) => {
   const wrapper = Object.keys(WRAPPER_PARAMS).find((key) => url.includes(key));
@@ -120,6 +131,7 @@ const toProviders = (data: SugoiProvider[] = []): EpisodeProviderProps[] =>
           // Deixa de ser embed: agora é uma playlist tocada no nosso player.
           isEmbed: provider.is_embed && !proxied && !direct,
           isHls: proxied || direct,
+          refusesSandbox: refusesSandbox(url),
           url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
         };
       })
