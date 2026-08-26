@@ -65,12 +65,35 @@ interface SugoiProvider {
 }
 
 /**
- * A página do Top Animes se auto-redireciona para a home quando roda fora do
- * domínio deles, então o embed nunca chega a mostrar o vídeo. O /api/stream
- * extrai a playlist HLS de dentro dela e serve o que dá para tocar aqui.
+ * O Top Animes não devolve um player, e sim uma página que embrulha o vídeo. Há
+ * três formatos no ar hoje:
+ *
+ * - `/antivirus…`: checa o `document.referrer` e, fora do domínio deles, troca
+ *   o próprio endereço pela home — era o que engolia o vídeo no nosso iframe;
+ * - `sk-api.alibabacdn.net`: busca as fontes com `mode=api2` e monta o player;
+ * - `/aviso/?url=…`: só uma sala de espera na frente do player de terceiros.
+ *
+ * Os dois primeiros o /api/stream resolve e devolve como playlist HLS. O
+ * terceiro a gente desembrulha e usa o embed que está lá dentro.
  */
-const isSelfBustingEmbed = (url: string) =>
-  url.includes("topanimes.net/antivirus");
+const WRAPPED_PLAYERS = [
+  "topanimes.net/antivirus",
+  "sk-api.alibabacdn.net",
+];
+
+const isWrappedPlayer = (url: string) =>
+  WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
+
+/** Tira o embed de dentro da página de aviso, quando é só isso que ela faz. */
+const unwrapNotice = (url: string) => {
+  if (!url.includes("topanimes.net/aviso")) return url;
+
+  try {
+    return new URL(url).searchParams.get("url") ?? url;
+  } catch {
+    return url;
+  }
+};
 
 /** Achata a resposta do SugoiAPI em uma lista simples de players válidos. */
 const toProviders = (data: SugoiProvider[] = []): EpisodeProviderProps[] =>
@@ -78,8 +101,8 @@ const toProviders = (data: SugoiProvider[] = []): EpisodeProviderProps[] =>
     (provider.episodes ?? [])
       .filter((episode) => !episode.error && !!episode.episode)
       .map((episode) => {
-        const url = episode.episode as string;
-        const proxied = isSelfBustingEmbed(url);
+        const url = unwrapNotice(episode.episode as string);
+        const proxied = isWrappedPlayer(url);
 
         return {
           name: provider.name,
