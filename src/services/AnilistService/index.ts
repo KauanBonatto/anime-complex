@@ -227,6 +227,7 @@ class AnilistServiceClass {
         : null,
       duration: media.duration ?? null,
       rankings: media.rankings ?? [],
+      trailer: this.toTrailer(media),
       availableEpisodes: this.toAvailableEpisodes(media),
       nextEpisode: this.toNextEpisode(media),
     };
@@ -291,6 +292,40 @@ class AnilistServiceClass {
       return Math.max(media.nextAiringEpisode.episode - 1, 0);
     }
     return media.episodes ?? 0;
+  }
+
+  /**
+   * O AniList guarda só o id do vídeo e o site onde ele está hospedado, então
+   * montamos aqui o endereço de embed. Ignoramos sites desconhecidos: sem um
+   * player conhecido não há como incorporar o vídeo.
+   */
+  private toTrailer(media: AnilistMedia): AnimeTrailerProps | null {
+    // Vários registros do AniList têm espaços e tabs colados no id (e no
+    // thumbnail montado a partir dele), o que quebraria a URL do player.
+    const id = media.trailer?.id?.trim();
+    if (!id) return null;
+
+    const site = media.trailer?.site?.trim().toLowerCase();
+
+    if (site === "youtube") {
+      return {
+        // O domínio nocookie evita o rastreamento do YouTube em quem só abre a
+        // ficha do anime; `rel=0` mantém as sugestões do fim dentro do canal.
+        embedUrl: `https://www.youtube-nocookie.com/embed/${id}?rel=0`,
+        thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        siteLabel: "YouTube",
+      };
+    }
+
+    if (site === "dailymotion") {
+      return {
+        embedUrl: `https://www.dailymotion.com/embed/video/${id}`,
+        thumbnail: media.trailer?.thumbnail?.trim() || null,
+        siteLabel: "Dailymotion",
+      };
+    }
+
+    return null;
   }
 
   /** Episódio já agendado pelo AniList, quando o anime ainda está no ar. */

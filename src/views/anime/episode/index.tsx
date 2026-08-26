@@ -28,7 +28,8 @@ import { useCallback, useEffect, useState } from "react";
 const sortProviders = (providers: EpisodeProviderProps[]) =>
   [...providers].sort(
     (a, b) =>
-      Number(a.hasAds) - Number(b.hasAds) || Number(b.isEmbed) - Number(a.isEmbed)
+      Number(a.hasAds) - Number(b.hasAds) ||
+      Number(b.isEmbed) - Number(a.isEmbed),
   );
 
 const AnimeEpisodeView = ({
@@ -43,7 +44,7 @@ const AnimeEpisodeView = ({
   const [loading, setLoading] = useState(true);
   const [invalidEpisode, setInvalidEpisode] = useState(false);
   const [animeDetails, setAnimeDetails] = useState<AnimeDetailsProps | null>(
-    null
+    null,
   );
   const [providers, setProviders] = useState<EpisodeProviderProps[]>([]);
   const [selectedProvider, setSelectedProvider] =
@@ -63,7 +64,7 @@ const AnimeEpisodeView = ({
     setAnimeDetails(animeDetailsData);
 
     const episodeProviders = sortProviders(
-      await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber)
+      await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),
     );
     setProviders(episodeProviders);
     setSelectedProvider(episodeProviders[0] ?? null);
@@ -131,9 +132,7 @@ const AnimeEpisodeView = ({
 
             {!loading && !selectedProvider && (
               <Typography>
-                Nenhum player encontrado para este episódio no SugoiAPI.
-                Verifique se a API local está rodando em{" "}
-                <code>http://localhost:1010</code>.
+                Nenhum player encontrado para este episódio.
               </Typography>
             )}
           </Grid>

@@ -44,10 +44,21 @@ interface AnimeDetailsProps extends AnimeProps {
   malUrl: string | null;
   duration: number | null;
   rankings: AnimeRankingProps[];
+  /** Trailer oficial, quando o AniList tem um cadastrado. */
+  trailer: AnimeTrailerProps | null;
   /** Episódios já exibidos, base para montar a lista de episódios. */
   availableEpisodes: number;
   /** Só existe em animes em exibição ou ainda não lançados. */
   nextEpisode: NextEpisodeProps | null;
+}
+
+/** Trailer do AniList, já convertido em endereço de embed. */
+interface AnimeTrailerProps {
+  /** URL pronta para o iframe, no player do YouTube ou do Dailymotion. */
+  embedUrl: string;
+  /** Capa exibida antes de o player carregar. */
+  thumbnail: string | null;
+  siteLabel: string;
 }
 
 /** Próximo episódio agendado, com o horário em segundos (epoch). */

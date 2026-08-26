@@ -97,6 +97,11 @@ export const ANIME_DETAILS_QUERY = `
       ${ANIME_FIELDS}
       bannerImage
       duration
+      trailer {
+        id
+        site
+        thumbnail
+      }
       nextAiringEpisode {
         episode
         airingAt

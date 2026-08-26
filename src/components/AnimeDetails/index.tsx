@@ -1,4 +1,5 @@
 import { AnimeScoreRating } from "@/components/AnimeScore";
+import AnimeTrailer from "@/components/AnimeTrailer";
 import NextEpisode from "@/components/NextEpisode";
 import { formatLabel, genreLabel, seasonLabel, statusLabel } from "@/utils/anime";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -164,12 +165,15 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
             <Typography
               variant="body2"
               sx={{ whiteSpace: "pre-line", maxWidth: 900 }}
+              mb={3}
             >
               {anime.description}
             </Typography>
           )}
 
-          <Stack direction="row" flexWrap="wrap" gap={2} mt={3}>
+          {!!anime.trailer && <AnimeTrailer trailer={anime.trailer} />}
+
+          <Stack direction="row" flexWrap="wrap" gap={2}>
             {!!anime.malUrl && (
               <Button
                 size="small"

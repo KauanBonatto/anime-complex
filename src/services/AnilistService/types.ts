@@ -31,6 +31,11 @@ export interface AnilistMedia {
   siteUrl?: string | null;
   description?: string | null;
   studios?: { nodes: { name: string }[] };
+  trailer?: {
+    id: string | null;
+    site: string | null;
+    thumbnail: string | null;
+  } | null;
   rankings?: AnimeRankingProps[];
   nextAiringEpisode?: {
     episode: number;
