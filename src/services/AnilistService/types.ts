@@ -37,6 +37,16 @@ export interface AnilistMedia {
     thumbnail: string | null;
   } | null;
   rankings?: AnimeRankingProps[];
+  externalLinks?: {
+    site: string | null;
+    url: string | null;
+    type: string | null;
+  }[] | null;
+  streamingEpisodes?: {
+    title: string | null;
+    url: string | null;
+    site: string | null;
+  }[] | null;
   nextAiringEpisode?: {
     episode: number;
     airingAt: number;

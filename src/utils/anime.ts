@@ -90,6 +90,25 @@ export const animeSlugCandidates = (anime: AnimeProps) =>
     )
   );
 
+/**
+ * Endereço da Crunchyroll para um episódio. Quando o AniList não lista aquele
+ * episódio (comum em séries longas, que só têm uma janela cadastrada), o link
+ * cai na página da série — ainda leva o usuário ao lugar certo.
+ */
+export const crunchyrollEpisodeLink = (
+  crunchyroll: CrunchyrollProps | null | undefined,
+  episodeNumber: number
+): CrunchyrollLinkProps | null => {
+  const episodeUrl = crunchyroll?.episodeUrls?.[episodeNumber];
+  if (episodeUrl) return { url: episodeUrl, isEpisode: true };
+
+  if (crunchyroll?.seriesUrl) {
+    return { url: crunchyroll.seriesUrl, isEpisode: false };
+  }
+
+  return null;
+};
+
 /** "sexta-feira, 29 de agosto às 13:00" — no fuso do usuário. */
 export const airingDateLabel = (airingAt: number) => {
   const date = new Date(airingAt * 1000);

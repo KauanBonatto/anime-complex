@@ -45,7 +45,9 @@ const listCache = createCache<ResponseApiProps>({
 
 /** Fichas completas, usadas pela página do anime e pela do episódio. */
 const detailsCache = createCache<AnimeDetailsProps | null>({
-  namespace: "anilist:details",
+  // O sufixo muda junto com o formato da ficha: fichas guardadas antes de um
+  // campo novo existir seguiriam válidas por uma hora, sem ele.
+  namespace: "anilist:details:v2",
   ttl: LIST_TTL,
   persist: true,
 });
@@ -228,6 +230,7 @@ class AnilistServiceClass {
       duration: media.duration ?? null,
       rankings: media.rankings ?? [],
       trailer: this.toTrailer(media),
+      crunchyroll: this.toCrunchyroll(media),
       availableEpisodes: this.toAvailableEpisodes(media),
       nextEpisode: this.toNextEpisode(media),
     };
@@ -326,6 +329,52 @@ class AnilistServiceClass {
     }
 
     return null;
+  }
+
+  /**
+   * A Crunchyroll aparece no AniList em dois lugares: `externalLinks` traz a
+   * página da série e `streamingEpisodes` traz o link direto de cada episódio
+   * ("Episode 12 - ..."), que é o que abre o vídeo já selecionado. A lista de
+   * episódios costuma cobrir só uma parte das temporadas longas, por isso a
+   * página da série continua guardada como plano B.
+   */
+  private toCrunchyroll(media: AnilistMedia): CrunchyrollProps | null {
+    const isCrunchyroll = (site?: string | null) =>
+      site?.trim().toLowerCase() === "crunchyroll";
+
+    const seriesLink = media.externalLinks?.find(
+      (link) => isCrunchyroll(link.site) && !!link.url
+    );
+
+    const episodeUrls: Record<number, string> = {};
+    for (const episode of media.streamingEpisodes ?? []) {
+      if (!isCrunchyroll(episode.site) || !episode.url) continue;
+
+      const number = this.toStreamingEpisodeNumber(episode.title);
+      // O primeiro link vence: episódios repetidos costumam ser dublagens.
+      if (number && !episodeUrls[number]) {
+        episodeUrls[number] = this.toSecureUrl(episode.url);
+      }
+    }
+
+    const seriesUrl = seriesLink?.url
+      ? this.toSecureUrl(seriesLink.url)
+      : null;
+
+    if (!seriesUrl && !Object.keys(episodeUrls).length) return null;
+
+    return { seriesUrl, episodeUrls };
+  }
+
+  /** "Episode 12 - Title" -> 12. Sem número reconhecível, devolve null. */
+  private toStreamingEpisodeNumber(title?: string | null): number | null {
+    const match = title?.match(/(?:epis[oó]dio|episode|ep\.?)\s*0*(\d+)/i);
+    return match ? Number(match[1]) : null;
+  }
+
+  /** O AniList ainda guarda vários links da Crunchyroll em http. */
+  private toSecureUrl(url: string): string {
+    return url.trim().replace(/^http:\/\//i, "https://");
   }
 
   /** Episódio já agendado pelo AniList, quando o anime ainda está no ar. */

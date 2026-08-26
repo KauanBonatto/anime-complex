@@ -110,6 +110,16 @@ export const ANIME_DETAILS_QUERY = `
       season
       seasonYear
       siteUrl
+      externalLinks {
+        site
+        url
+        type
+      }
+      streamingEpisodes {
+        title
+        url
+        site
+      }
       description(asHtml: false)
       studios(isMain: true) {
         nodes {

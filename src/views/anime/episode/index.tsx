@@ -1,11 +1,13 @@
 "use client";
 
 import AnimeEpisodesGrid from "@/components/AnimeEpisodesGrid";
+import CrunchyrollChip from "@/components/CrunchyrollChip";
 import EpisodePlayer from "@/components/EpisodePlayer";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import AnilistService from "@/services/AnilistService";
 import SugoiService from "@/services/SugoiService";
+import { crunchyrollEpisodeLink } from "@/utils/anime";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import {
@@ -15,6 +17,7 @@ import {
   Grid,
   LinearProgress,
   Skeleton,
+  Stack,
   Typography,
 } from "@mui/material";
 import { notFound } from "next/navigation";
@@ -83,6 +86,11 @@ const AnimeEpisodeView = ({
   const hasNextEpisode =
     !!animeDetails && episodeNumber < animeDetails.availableEpisodes;
 
+  const crunchyrollLink = crunchyrollEpisodeLink(
+    animeDetails?.crunchyroll,
+    episodeNumber,
+  );
+
   return (
     <Box width="100%">
       {loading && (
@@ -127,13 +135,23 @@ const AnimeEpisodeView = ({
                 providers={providers}
                 selectedProvider={selectedProvider}
                 onSelectProvider={setSelectedProvider}
+                episodeNumber={episodeNumber}
+                crunchyroll={crunchyrollLink}
               />
             )}
 
             {!loading && !selectedProvider && (
-              <Typography>
-                Nenhum player encontrado para este episódio.
-              </Typography>
+              <Stack alignItems="center" gap={2}>
+                <Typography>
+                  Nenhum player encontrado para este episódio.
+                </Typography>
+                {crunchyrollLink && (
+                  <CrunchyrollChip
+                    link={crunchyrollLink}
+                    episodeNumber={episodeNumber}
+                  />
+                )}
+              </Stack>
             )}
           </Grid>
 
