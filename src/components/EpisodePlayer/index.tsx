@@ -33,14 +33,16 @@ const PLAYER_PERMISSIONS =
 /**
  * O mesmo provider pode devolver mais de um link para o episódio, então as
  * repetições ganham um número para o usuário conseguir diferenciar as opções.
+ * A contagem é por nome, e não por provider, porque players que já vêm com nome
+ * próprio ("Top Animes (Filemoon)") se distinguem sozinhos.
  */
 const buildOptions = (providers: EpisodeProviderProps[]) => {
   const used: Record<string, number> = {};
 
   return providers.map((provider) => {
-    const position = (used[provider.slug] = (used[provider.slug] ?? 0) + 1);
+    const position = (used[provider.name] = (used[provider.name] ?? 0) + 1);
     const repeated =
-      providers.filter(({ slug }) => slug === provider.slug).length > 1;
+      providers.filter(({ name }) => name === provider.name).length > 1;
 
     return {
       ...provider,

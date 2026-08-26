@@ -1,3 +1,8 @@
+import {
+  isWrappedPlayer,
+  listEpisodePlayers,
+  unwrapPlayer,
+} from "@/utils/topAnimes";
 import { NextResponse } from "next/server";
 
 /**
@@ -41,7 +46,7 @@ export async function GET(
     }
 
     const body = await response.json();
-    return NextResponse.json({ providers: toProviders(body?.data) });
+    return NextResponse.json({ providers: await toProviders(body?.data) });
   } catch (err) {
     return NextResponse.json(
       { providers: [], unavailable: true },
@@ -64,63 +69,61 @@ interface SugoiProvider {
   episodes: SugoiEpisode[];
 }
 
-/**
- * O Top Animes não devolve um player, e sim uma página que embrulha o vídeo, e
- * cada episódio pode vir num formato diferente. Há quatro no ar hoje.
- *
- * Dois escondem a playlist e só o servidor consegue chegar nela, então passam
- * pelo /api/stream:
- *
- * - `/antivirus…`: checa o `document.referrer` e, fora do domínio deles, troca
- *   o próprio endereço pela home — era o que engolia o vídeo no nosso iframe;
- * - `sk-api.alibabacdn.net`: busca as fontes com `mode=api2`, de uma origem que
- *   não libera CORS para nós.
- */
-const WRAPPED_PLAYERS = ["topanimes.net/antivirus", "sk-api.alibabacdn.net"];
+const TOP_ANIMES = "top-animes";
 
-/**
- * Os outros dois carregam o endereço real no próprio link, então basta abrir o
- * embrulho: `/aviso/?url=` é uma sala de espera na frente de um player de
- * terceiros, e `videohls.php?d=` é uma tela de anúncios na frente de um m3u8.
- */
-const WRAPPER_PARAMS: Record<string, string> = {
-  "topanimes.net/aviso": "url",
-  "anivideo.net/videohls": "d",
+/** Traduz um endereço de player no que o nosso player sabe tocar. */
+const toProvider = (
+  provider: SugoiProvider,
+  rawUrl: string,
+  label?: string | null
+): EpisodeProviderProps => {
+  const url = unwrapPlayer(rawUrl);
+  const proxied = isWrappedPlayer(url);
+  // Playlist que o browser alcança sozinho, sem intermédio nenhum.
+  const direct = url.includes(".m3u8");
+
+  return {
+    name: label ? `${provider.name} (${label})` : provider.name,
+    slug: provider.slug,
+    hasAds: provider.has_ads,
+    // Deixa de ser embed: agora é uma playlist tocada no nosso player.
+    isEmbed: provider.is_embed && !proxied && !direct,
+    isHls: proxied || direct,
+    url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
+  };
 };
 
-const isWrappedPlayer = (url: string) =>
-  WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
+const validEpisodes = (provider: SugoiProvider) =>
+  (provider.episodes ?? []).filter(
+    (episode) => !episode.error && !!episode.episode
+  );
 
-const unwrapPlayer = (url: string) => {
-  const wrapper = Object.keys(WRAPPER_PARAMS).find((key) => url.includes(key));
-  if (!wrapper) return url;
+/**
+ * A API entrega um player por provider. No Top Animes isso é pouco: a página do
+ * episódio costuma ter vários, e é comum o primeiro estar fora do ar enquanto os
+ * outros funcionam. Para esse a gente lê a página e oferece a lista inteira.
+ */
+const expandProvider = async (
+  provider: SugoiProvider
+): Promise<EpisodeProviderProps[]> => {
+  const episodes = validEpisodes(provider);
+  const fallback = () =>
+    episodes.map((episode) => toProvider(provider, episode.episode as string));
+
+  if (provider.slug !== TOP_ANIMES || !episodes.length) return fallback();
 
   try {
-    return new URL(url).searchParams.get(WRAPPER_PARAMS[wrapper]) ?? url;
-  } catch {
-    return url;
+    const players = await listEpisodePlayers(episodes[0].searched_endpoint);
+    return players.length
+      ? players.map(({ label, url }) => toProvider(provider, url, label))
+      : fallback();
+  } catch (err) {
+    return fallback();
   }
 };
 
 /** Achata a resposta do SugoiAPI em uma lista simples de players válidos. */
-const toProviders = (data: SugoiProvider[] = []): EpisodeProviderProps[] =>
-  (data ?? []).flatMap((provider) =>
-    (provider.episodes ?? [])
-      .filter((episode) => !episode.error && !!episode.episode)
-      .map((episode) => {
-        const url = unwrapPlayer(episode.episode as string);
-        const proxied = isWrappedPlayer(url);
-        // Playlist que o browser alcança sozinho, sem intermédio nenhum.
-        const direct = url.includes(".m3u8");
-
-        return {
-          name: provider.name,
-          slug: provider.slug,
-          hasAds: provider.has_ads,
-          // Deixa de ser embed: agora é uma playlist tocada no nosso player.
-          isEmbed: provider.is_embed && !proxied && !direct,
-          isHls: proxied || direct,
-          url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
-        };
-      })
-  );
+const toProviders = async (
+  data: SugoiProvider[] = []
+): Promise<EpisodeProviderProps[]> =>
+  (await Promise.all((data ?? []).map(expandProvider))).flat();
