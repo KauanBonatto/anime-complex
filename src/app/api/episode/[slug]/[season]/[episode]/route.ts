@@ -64,16 +64,31 @@ interface SugoiProvider {
   episodes: SugoiEpisode[];
 }
 
+/**
+ * A página do Top Animes se auto-redireciona para a home quando roda fora do
+ * domínio deles, então o embed nunca chega a mostrar o vídeo. O /api/stream
+ * extrai a playlist HLS de dentro dela e serve o que dá para tocar aqui.
+ */
+const isSelfBustingEmbed = (url: string) =>
+  url.includes("topanimes.net/antivirus");
+
 /** Achata a resposta do SugoiAPI em uma lista simples de players válidos. */
 const toProviders = (data: SugoiProvider[] = []): EpisodeProviderProps[] =>
   (data ?? []).flatMap((provider) =>
     (provider.episodes ?? [])
       .filter((episode) => !episode.error && !!episode.episode)
-      .map((episode) => ({
-        name: provider.name,
-        slug: provider.slug,
-        hasAds: provider.has_ads,
-        isEmbed: provider.is_embed,
-        url: episode.episode as string,
-      }))
+      .map((episode) => {
+        const url = episode.episode as string;
+        const proxied = isSelfBustingEmbed(url);
+
+        return {
+          name: provider.name,
+          slug: provider.slug,
+          hasAds: provider.has_ads,
+          // Deixa de ser embed: agora é uma playlist tocada no nosso player.
+          isEmbed: provider.is_embed && !proxied,
+          isHls: proxied,
+          url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
+        };
+      })
   );

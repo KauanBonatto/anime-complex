@@ -92,6 +92,8 @@ interface EpisodeProviderProps {
   slug: string;
   hasAds: boolean;
   isEmbed: boolean;
+  /** Playlist HLS, que precisa do hls.js fora do Safari. */
+  isHls?: boolean;
   url: string;
 }
 

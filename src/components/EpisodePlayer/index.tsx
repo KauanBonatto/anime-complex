@@ -1,4 +1,5 @@
 import CrunchyrollChip from "@/components/CrunchyrollChip";
+import HlsVideo from "@/components/HlsVideo";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -70,7 +71,14 @@ const EpisodePlayer = ({
 
   return (
     <Box width="100%" textAlign="center">
-      {selectedProvider.isEmbed ? (
+      {selectedProvider.isHls ? (
+        <HlsVideo
+          key={selectedProvider.url}
+          src={selectedProvider.url}
+          style={PLAYER_STYLE}
+          onError={() => setPlayerFailed(true)}
+        />
+      ) : selectedProvider.isEmbed ? (
         <iframe
           key={selectedProvider.url}
           allowFullScreen

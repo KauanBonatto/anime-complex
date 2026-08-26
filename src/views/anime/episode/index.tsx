@@ -25,14 +25,18 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Prioriza players sem anúncios e, entre eles, os embeds: os links diretos de
- * vídeo vêm com token do CDN e costumam responder 401 fora do site de origem.
+ * Prioriza players sem anúncios e, entre eles, os embeds e as playlists HLS: os
+ * links diretos de vídeo vêm com token do CDN e costumam responder 401 fora do
+ * site de origem.
  */
+const isHosted = (provider: EpisodeProviderProps) =>
+  provider.isEmbed || !!provider.isHls;
+
 const sortProviders = (providers: EpisodeProviderProps[]) =>
   [...providers].sort(
     (a, b) =>
       Number(a.hasAds) - Number(b.hasAds) ||
-      Number(b.isEmbed) - Number(a.isEmbed),
+      Number(isHosted(b)) - Number(isHosted(a)),
   );
 
 const AnimeEpisodeView = ({
