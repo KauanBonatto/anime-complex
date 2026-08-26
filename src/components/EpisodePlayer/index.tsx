@@ -85,11 +85,7 @@ const EpisodePlayer = ({
 
       <Stack alignItems="center" gap={1.5} mt={3}>
         <Typography variant="subtitle2" color="text.disabled">
-          {options.length === 1
-            ? "1 player disponível"
-            : `${options.length} players disponíveis`}
-          {crunchyroll && " + Crunchyroll"}
-          {hasChoice && " — escolha por onde assistir"}
+          {hasChoice && " Escolha por onde assistir"}
         </Typography>
 
         <Stack

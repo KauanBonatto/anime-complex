@@ -19,8 +19,8 @@ const CrunchyrollChip = ({
   <Tooltip
     title={
       link.isEpisode
-        ? `Assistir o episódio ${episodeNumber} na Crunchyroll`
-        : "Abrir a série na Crunchyroll — este episódio não está listado lá"
+        ? `Assistir o episódio na Crunchyroll`
+        : "Abrir anime na Crunchyroll"
     }
   >
     <Button
