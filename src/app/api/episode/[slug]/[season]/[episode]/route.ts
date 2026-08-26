@@ -1,5 +1,4 @@
 import {
-  hidesReferrer,
   isWrappedPlayer,
   listEpisodePlayers,
   unwrapPlayer,
@@ -90,7 +89,6 @@ const toProvider = (
     // Deixa de ser embed: agora é uma playlist tocada no nosso player.
     isEmbed: provider.is_embed && !proxied && !direct,
     isHls: proxied || direct,
-    hideReferrer: hidesReferrer(url),
     url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
   };
 };

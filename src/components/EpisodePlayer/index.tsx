@@ -86,11 +86,7 @@ const EpisodePlayer = ({
           allowFullScreen
           sandbox={PLAYER_SANDBOX}
           allow={PLAYER_PERMISSIONS}
-          referrerPolicy={
-            selectedProvider.hideReferrer
-              ? "no-referrer"
-              : "origin-when-cross-origin"
-          }
+          referrerPolicy="origin-when-cross-origin"
           title={`Player do ${selectedProvider.name}`}
           style={PLAYER_STYLE}
           src={selectedProvider.url}
