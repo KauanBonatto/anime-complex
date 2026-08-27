@@ -1,10 +1,18 @@
 import { AnimeScoreBadge } from "@/components/AnimeScore";
 import { animeMetaLine } from "@/utils/anime";
+import { mangaMetaLine } from "@/utils/manga";
 import { Box, Chip, Paper, Typography } from "@mui/material";
 import Image from "next/image";
 
-const AnimeCard = ({ anime }: { anime: AnimeProps }) => {
-  const metaLine = animeMetaLine(anime);
+const AnimeCard = ({
+  anime,
+  media = "anime",
+}: {
+  anime: AnimeProps;
+  media?: MediaType;
+}) => {
+  const metaLine =
+    media === "manga" ? mangaMetaLine(anime) : animeMetaLine(anime);
 
   return (
     <Paper

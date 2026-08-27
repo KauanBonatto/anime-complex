@@ -21,7 +21,13 @@ interface AnimeProps {
   format?: string | null;
   status?: string | null;
   totalEpisodes?: number | null;
+  /** Só em mangás: capítulos e volumes publicados. */
+  totalChapters?: number | null;
+  totalVolumes?: number | null;
 }
+
+/** Qual catálogo a lista exibe: muda o link do card e a linha de metadados. */
+type MediaType = "anime" | "manga";
 
 interface AnimeGridProps {
   title: string;
@@ -31,6 +37,8 @@ interface AnimeGridProps {
   /** Muda sempre que os filtros mudam, para voltar à primeira página. */
   resetToken?: string;
   emptyMessage?: string;
+  /** Padrão: "anime". */
+  media?: MediaType;
 }
 
 /** Ficha completa vinda do AniList (dados + avaliação). */

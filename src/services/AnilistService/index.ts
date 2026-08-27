@@ -1,4 +1,3 @@
-import axios from "axios";
 import {
   ANIME_DETAILS_QUERY,
   POPULAR_ANIME_QUERY,
@@ -7,15 +6,14 @@ import {
   SEARCH_ANIME_QUERY,
 } from "./queries";
 import { AnilistMedia, AnilistPage } from "./types";
+import {
+  DEFAULT_COVER,
+  EMPTY_RESPONSE,
+  anilistRequest,
+  genresKey,
+} from "./client";
+import { cleanDescription } from "@/utils/anime";
 import { ONE_HOUR, createCache } from "@/utils/cache";
-
-const anilistApi = axios.create({
-  baseURL: "https://graphql.anilist.co",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-});
 
 const PER_PAGE = 24;
 
@@ -64,31 +62,8 @@ const airingWindowCache = createCache<AnimeProps[]>({
 
 const AIRING_WINDOW_KEY = "current";
 
-/** Chave estável: a ordem dos gêneros escolhidos não pode mudar o cache. */
-const genresKey = (genres: string[]) => [...genres].sort().join(",");
-
-const DEFAULT_COVER =
-  "https://s4.anilist.co/file/anilistcdn/media/anime/cover/default.jpg";
-
-const EMPTY_RESPONSE: ResponseApiProps = {
-  currentPage: 1,
-  hasNextPage: false,
-  results: [],
-};
-
 class AnilistServiceClass {
-  private async request<T>(
-    query: string,
-    variables: Record<string, unknown>
-  ): Promise<T | null> {
-    try {
-      const { data } = await anilistApi.post("", { query, variables });
-      if (data?.errors?.length) return null;
-      return data?.data as T;
-    } catch (err) {
-      return null;
-    }
-  }
+  private request = anilistRequest;
 
   /** Animes mais populares, opcionalmente filtrados por gênero. */
   async getPopularAnime(
@@ -218,7 +193,7 @@ class AnilistServiceClass {
     const media = data.Media;
     return {
       ...this.toAnime(media),
-      description: this.cleanDescription(media.description),
+      description: cleanDescription(media.description),
       bannerImage: media.bannerImage ?? null,
       season: media.season ?? null,
       seasonYear: media.seasonYear ?? null,
@@ -437,15 +412,6 @@ class AnilistServiceClass {
       seen.add(anime.id);
       return true;
     });
-  }
-
-  private cleanDescription(description?: string | null): string | null {
-    if (!description) return null;
-    return description
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
   }
 }
 

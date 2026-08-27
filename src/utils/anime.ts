@@ -56,6 +56,24 @@ export const seasonLabel = (season?: string | null) =>
 
 export const genreLabel = (genre: string) => GENRE_LABELS[genre] ?? genre;
 
+/** A sinopse do AniList vem com HTML no meio; a tela mostra texto puro. */
+export const cleanDescription = (
+  description?: string | null
+): string | null => {
+  if (!description) return null;
+  return description
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+/** Chip de ranking da ficha: "#3 melhor avaliado de todos os tempos". */
+export const rankLabel = (ranking: AnimeRankingProps) =>
+  `#${ranking.rank} ${
+    ranking.type === "RATED" ? "melhor avaliado" : "mais popular"
+  } de todos os tempos`;
+
 /** Monta a linha de metadados do card: "2023 · Série · 28 eps". */
 export const animeMetaLine = (anime: AnimeProps) =>
   [

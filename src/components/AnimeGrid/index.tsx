@@ -12,6 +12,7 @@ const AnimeGrid = ({
   getAnimeData,
   resetToken,
   emptyMessage = "Nenhum anime encontrado com os parâmetros informados!",
+  media = "anime",
 }: AnimeGridProps) => {
   const theme = useTheme();
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -87,8 +88,8 @@ const AnimeGrid = ({
 
         {hasResults &&
           animeData.results.map((anime, index) => (
-            <Link key={anime.id + index} href={`/anime/${anime.id}`}>
-              <AnimeCard anime={anime} />
+            <Link key={anime.id + index} href={`/${media}/${anime.id}`}>
+              <AnimeCard anime={anime} media={media} />
             </Link>
           ))}
       </Box>

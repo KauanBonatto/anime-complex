@@ -1,14 +1,11 @@
 import { AnimeScoreRating } from "@/components/AnimeScore";
-import AnimeTrailer from "@/components/AnimeTrailer";
 import MetaItem from "@/components/MetaItem";
-import NextEpisode from "@/components/NextEpisode";
+import { genreLabel, rankLabel } from "@/utils/anime";
 import {
-  formatLabel,
-  genreLabel,
-  rankLabel,
-  seasonLabel,
-  statusLabel,
-} from "@/utils/anime";
+  mangaFormatLabel,
+  mangaStatusLabel,
+  publicationYearsLabel,
+} from "@/utils/manga";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import {
   Box,
@@ -21,15 +18,39 @@ import {
 } from "@mui/material";
 import Image from "next/image";
 
-const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
-  const allTimeRankings = anime.rankings.filter((ranking) => ranking.allTime);
-  const seasonText = [seasonLabel(anime.season), anime.seasonYear]
-    .filter(Boolean)
-    .join(" de ");
+const MangaDetails = ({ manga }: { manga: MangaDetailsProps }) => {
+  const allTimeRankings = manga.rankings.filter((ranking) => ranking.allTime);
+
+  // Mangás longos costumam ficar sem contagem de capítulos ou volumes no
+  // AniList. Montamos a lista já sem os vazios porque o Stack desenha uma
+  // divisória por filho — inclusive pelos que não renderizam nada.
+  const metaItems = [
+    { label: "Formato", value: mangaFormatLabel(manga.format) },
+    { label: "Situação", value: mangaStatusLabel(manga.status) },
+    {
+      label: "Capítulos",
+      value: manga.totalChapters ? String(manga.totalChapters) : null,
+    },
+    {
+      label: "Volumes",
+      value: manga.totalVolumes ? String(manga.totalVolumes) : null,
+    },
+    {
+      label: "Publicação",
+      value: publicationYearsLabel(manga.startYear, manga.endYear, manga.status),
+    },
+    { label: "Autoria", value: manga.authors.join(", ") || null },
+    {
+      label: "Popularidade",
+      value: manga.popularity
+        ? `${manga.popularity.toLocaleString("pt-BR")} usuários`
+        : null,
+    },
+  ].filter((item) => !!item.value);
 
   return (
     <Box width="100%">
-      {anime.bannerImage && (
+      {manga.bannerImage && (
         <Box
           sx={{
             position: "relative",
@@ -41,8 +62,8 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
           }}
         >
           <Image
-            src={anime.bannerImage}
-            alt={anime.title}
+            src={manga.bannerImage}
+            alt={manga.title}
             fill
             priority
             sizes="100vw"
@@ -54,8 +75,8 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
       <Grid container spacing={4}>
         <Grid item xs={12} sm="auto">
           <Image
-            src={anime.image}
-            alt={anime.title}
+            src={manga.image}
+            alt={manga.title}
             width={230}
             height={325}
             priority
@@ -66,18 +87,18 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
 
         <Grid item xs={12} sm>
           <Typography variant="h4" fontWeight={500}>
-            {anime.title}
+            {manga.title}
           </Typography>
-          {!!anime.titleEnglish && anime.titleEnglish !== anime.title && (
+          {!!manga.titleEnglish && manga.titleEnglish !== manga.title && (
             <Typography variant="subtitle1" color="text.disabled" mb={1}>
-              {anime.titleEnglish}
+              {manga.titleEnglish}
             </Typography>
           )}
 
           <Box mt={2} mb={2}>
             <AnimeScoreRating
-              score={anime.score}
-              favourites={anime.favourites}
+              score={manga.score}
+              favourites={manga.favourites}
             />
           </Box>
 
@@ -103,41 +124,14 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
             mb={3}
             divider={<Divider orientation="vertical" flexItem />}
           >
-            <MetaItem label="Formato" value={formatLabel(anime.format)} />
-            <MetaItem label="Situação" value={statusLabel(anime.status)} />
-            <MetaItem
-              label="Episódios"
-              value={anime.totalEpisodes ? String(anime.totalEpisodes) : null}
-            />
-            <MetaItem
-              label="Duração"
-              value={anime.duration ? `${anime.duration} min` : null}
-            />
-            <MetaItem label="Temporada" value={seasonText || null} />
-            <MetaItem
-              label="Estúdio"
-              value={anime.studios.join(", ") || null}
-            />
-            <MetaItem
-              label="Popularidade"
-              value={
-                anime.popularity
-                  ? `${anime.popularity.toLocaleString("pt-BR")} usuários`
-                  : null
-              }
-            />
+            {metaItems.map((item) => (
+              <MetaItem key={item.label} label={item.label} value={item.value} />
+            ))}
           </Stack>
 
-          {!!anime.nextEpisode && (
-            <NextEpisode
-              nextEpisode={anime.nextEpisode}
-              status={anime.status}
-            />
-          )}
-
-          {!!anime.genres?.length && (
+          {!!manga.genres?.length && (
             <Stack direction="row" flexWrap="wrap" gap={1} mb={3}>
-              {anime.genres.map((genre) => (
+              {manga.genres.map((genre) => (
                 <Chip
                   key={genre}
                   size="small"
@@ -148,37 +142,35 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
             </Stack>
           )}
 
-          {!!anime.description && (
+          {!!manga.description && (
             <Typography
               variant="body2"
               sx={{ whiteSpace: "pre-line", maxWidth: 900 }}
               mb={3}
             >
-              {anime.description}
+              {manga.description}
             </Typography>
           )}
 
-          {!!anime.trailer && <AnimeTrailer trailer={anime.trailer} />}
-
           <Stack direction="row" flexWrap="wrap" gap={2}>
-            {!!anime.malUrl && (
+            {!!manga.malUrl && (
               <Button
                 size="small"
                 variant="outlined"
                 endIcon={<OpenInNewIcon />}
-                href={anime.malUrl}
+                href={manga.malUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Ver no MyAnimeList
               </Button>
             )}
-            {!!anime.siteUrl && (
+            {!!manga.siteUrl && (
               <Button
                 size="small"
                 variant="outlined"
                 endIcon={<OpenInNewIcon />}
-                href={anime.siteUrl}
+                href={manga.siteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -192,4 +184,4 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
   );
 };
 
-export default AnimeDetails;
+export default MangaDetails;

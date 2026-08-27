@@ -30,6 +30,11 @@ const FooterComponent = () => {
           >
             SugoiAPI
           </Link>
+          {" · "}Sinopses de mangá via{" "}
+          <Link href="https://mangadex.org" style={{ color: `#2196f3` }}>
+            MangaDex
+          </Link>{" "}
+          e seus grupos de tradução
         </Typography>
       </AppBar>
     </Box>
