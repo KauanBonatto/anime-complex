@@ -4,6 +4,7 @@ import {
   isWrappedPlayer,
   refusesSandbox,
   listEpisodePlayers,
+  showsAds,
   unwrapPlayer,
 } from "@/utils/topAnimes";
 import { NextResponse } from "next/server";
@@ -117,7 +118,7 @@ const toProvider = (
   return {
     name: label ? `${provider.name} (${label})` : provider.name,
     slug: provider.slug,
-    hasAds: provider.has_ads,
+    hasAds: provider.has_ads || showsAds(url),
     // Deixa de ser embed: agora é uma playlist tocada no nosso player.
     isEmbed: provider.is_embed && !proxied && !direct,
     isHls: proxied || direct,

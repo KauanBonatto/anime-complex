@@ -36,8 +36,28 @@ const OFFLINE_PLAYER = "topanimes.net/off";
  */
 const SANDBOX_REFUSERS = ["filemoon.sx", "strp2p.com"];
 
+/**
+ * O Top Animes chega da API com `has_ads: false`, e a página dele de fato não
+ * tem anúncio nenhum — mas boa parte dos embeds que ela hospeda vem de host que
+ * vive de pop-up. Quem avisa o usuário precisa ser o host que vai tocar, e não
+ * quem indicou o link.
+ */
+const AD_HOSTS = ["filemoon", "streamtape", "mixdrop", "vgembed", "vidguard"];
+
+/** Vazio quando o endereço é relativo, o que só acontece com o /api/stream. */
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch (err) {
+    return "";
+  }
+};
+
 export const refusesSandbox = (url: string) =>
-  SANDBOX_REFUSERS.some((host) => url.includes(host));
+  SANDBOX_REFUSERS.some((host) => hostOf(url).includes(host));
+
+export const showsAds = (url: string) =>
+  AD_HOSTS.some((host) => hostOf(url).includes(host));
 
 export const isWrappedPlayer = (url: string) =>
   WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
