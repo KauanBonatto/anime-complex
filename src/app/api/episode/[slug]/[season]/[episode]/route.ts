@@ -1,4 +1,5 @@
 import {
+  isOfflinePlayer,
   isWrappedPlayer,
   refusesSandbox,
   listEpisodePlayers,
@@ -109,8 +110,16 @@ const expandProvider = async (
   provider: SugoiProvider
 ): Promise<EpisodeProviderProps[]> => {
   const episodes = validEpisodes(provider);
+  /**
+   * A API não distingue um player de um aviso de que o player caiu, então o
+   * endereço cru dela pode ser a própria página de "está offline" — que não
+   * pode virar botão nem quando é tudo o que sobrou.
+   */
   const fallback = () =>
-    episodes.map((episode) => toProvider(provider, episode.episode as string));
+    episodes
+      .map((episode) => episode.episode as string)
+      .filter((url) => !isOfflinePlayer(url))
+      .map((url) => toProvider(provider, url));
 
   if (provider.slug !== TOP_ANIMES || !episodes.length) return fallback();
 
