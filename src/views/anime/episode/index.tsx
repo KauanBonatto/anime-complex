@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import AnilistService from "@/services/AnilistService";
 import SugoiService from "@/services/SugoiService";
+import TmdbService from "@/services/TmdbService";
 import { crunchyrollEpisodeLink } from "@/utils/anime";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
@@ -70,6 +71,15 @@ const AnimeEpisodeView = ({
       return;
     }
     setAnimeDetails(animeDetailsData);
+    // O nome do episódio vem em inglês do AniList; o TMDB tem a versão em
+    // pt-BR. Os players não esperam por essa tradução — são buscados logo
+    // abaixo — e ela só é aplicada se a página ainda estiver no mesmo anime,
+    // para uma resposta atrasada não sobrescrever outra ficha.
+    TmdbService.localize(animeDetailsData).then((localized) =>
+      setAnimeDetails((current) =>
+        current?.id === localized.id ? localized : current,
+      ),
+    );
 
     const episodeProviders = sortProviders(
       await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),

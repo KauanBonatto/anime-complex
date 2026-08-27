@@ -38,7 +38,12 @@ export async function GET(
 ) {
   const anilistId = Number(params.anime_id);
   if (!anilistId) {
-    return NextResponse.json({ description: null, title: null, source: null });
+    return NextResponse.json({
+      description: null,
+      title: null,
+      episodeTitles: {},
+      source: null,
+    });
   }
 
   const search = new URL(request.url).searchParams;
@@ -52,8 +57,11 @@ export async function GET(
   const synopsis = await synopsisCache.resolve(
     String(anilistId),
     () => getPtBrSynopsis({ anilistId, titles: uniqueTitles, year, format }),
-    // Sem sinopse pode ser o TMDB fora do ar; tentamos de novo na próxima.
-    { shouldStore: (result) => !!result.description }
+    // Resposta vazia pode ser o TMDB fora do ar; tentamos de novo na próxima.
+    {
+      shouldStore: (result) =>
+        !!result.description || Object.keys(result.episodeTitles).length > 0,
+    }
   );
 
   return NextResponse.json(synopsis, { headers: CACHE_HEADERS });

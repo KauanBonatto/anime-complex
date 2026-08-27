@@ -22,11 +22,10 @@ const AnimeInfoView = ({ params }: { params: { anime_id: string } }) => {
     setLoading(true);
 
     const animeDetailsData = await AnilistService.getAnimeDetails(animeId);
-    // A sinopse do AniList vem em inglês; o TMDB tem a versão em pt-BR.
+    // A sinopse e os nomes de episódio do AniList vêm em inglês; o TMDB tem a
+    // versão em pt-BR.
     setAnimeDetails(
-      animeDetailsData
-        ? await TmdbService.localizeDescription(animeDetailsData)
-        : null
+      animeDetailsData ? await TmdbService.localize(animeDetailsData) : null
     );
     setNotFoundAnime(!animeDetailsData);
     setLoading(false);

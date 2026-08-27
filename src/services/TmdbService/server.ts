@@ -38,18 +38,27 @@ interface TmdbRef {
   id: number;
   /** Temporada correspondente no TMDB, quando o anime é parte de uma série. */
   season: number | null;
+  /**
+   * Quantos episódios da temporada do TMDB vêm antes do episódio 1 daqui.
+   * Os cours divididos ("Part 2") reiniciam a contagem no AniList e continuam
+   * a do TMDB: sem isso, o episódio 1 receberia o nome do 13.
+   */
+  episodeOffset: number;
 }
 
 export interface SynopsisResult {
   description: string | null;
   /** Título em pt-BR, quando o TMDB tem um. */
   title: string | null;
+  /** Nome de cada episódio em pt-BR, por número. */
+  episodeTitles: Record<number, string>;
   source: "tmdb" | null;
 }
 
 const EMPTY_RESULT: SynopsisResult = {
   description: null,
   title: null,
+  episodeTitles: {},
   source: null,
 };
 
@@ -58,6 +67,7 @@ interface FribbEntry {
   /** O campo `movie` vem como lista de IDs; `tv` vem como número solto. */
   themoviedb_id?: { tv?: number | number[]; movie?: number | number[] };
   season?: { tmdb?: number };
+  episode_offset?: { tmdb?: number };
 }
 
 interface TmdbTitle {
@@ -117,10 +127,19 @@ const firstId = (value?: number | number[]): number | null => {
 
 const toRef = (entry: FribbEntry): TmdbRef | null => {
   const tv = firstId(entry.themoviedb_id?.tv);
-  if (tv) return { kind: "tv", id: tv, season: entry.season?.tmdb ?? null };
+  if (tv) {
+    return {
+      kind: "tv",
+      id: tv,
+      season: entry.season?.tmdb ?? null,
+      episodeOffset: entry.episode_offset?.tmdb ?? 0,
+    };
+  }
 
   const movie = firstId(entry.themoviedb_id?.movie);
-  if (movie) return { kind: "movie", id: movie, season: null };
+  if (movie) {
+    return { kind: "movie", id: movie, season: null, episodeOffset: 0 };
+  }
 
   return null;
 };
@@ -182,8 +201,46 @@ const toResult = (data: TmdbTitle | null): SynopsisResult => {
   return {
     description,
     title: text(data?.name) ?? text(data?.title),
+    episodeTitles: {},
     source: "tmdb",
   };
+};
+
+interface TmdbSeason {
+  episodes?: { episode_number?: number; name?: string | null }[];
+}
+
+/**
+ * Sem tradução cadastrada o TMDB devolve "Episódio 5" como nome — repetir o
+ * número que a tela já mostra não ajuda ninguém, então descartamos.
+ */
+const isGenericEpisodeName = (name: string) =>
+  /^epis[oó]dio\s+\d+$/i.test(name);
+
+/**
+ * Nomes dos episódios em pt-BR. Filmes não têm episódios, e a numeração do
+ * AniList é por temporada — a mesma que o `season` do mapeamento aponta.
+ */
+const fetchEpisodeTitles = async (
+  ref: TmdbRef
+): Promise<Record<number, string>> => {
+  if (ref.kind !== "tv") return {};
+
+  const season = await tmdbRequest<TmdbSeason>(
+    `/tv/${ref.id}/season/${ref.season ?? 1}`
+  );
+
+  const titles: Record<number, string> = {};
+  for (const episode of season?.episodes ?? []) {
+    const name = text(episode.name);
+    if (!name || !episode.episode_number || isGenericEpisodeName(name)) continue;
+
+    // Traz a numeração do TMDB para a do AniList, que é a exibida na tela.
+    const number = episode.episode_number - ref.episodeOffset;
+    if (number > 0) titles[number] = name;
+  }
+
+  return titles;
 };
 
 const fromRef = async (ref: TmdbRef): Promise<SynopsisResult> => {
@@ -245,13 +302,24 @@ const pickResult = (
   return firstYear && Math.abs(firstYear - year) <= 1 ? first : null;
 };
 
+interface SearchOutcome {
+  result: SynopsisResult;
+  /**
+   * Sempre nulo: a busca por título acerta o bastante para uma sinopse, mas
+   * não o suficiente para uma lista de episódios — casar a série errada
+   * renomearia a temporada inteira. Nomes de episódio só saem da tabela de
+   * equivalência, que casa por ID do AniList.
+   */
+  ref: TmdbRef | null;
+}
+
 /** Plano B quando o anime não está na tabela de equivalência. */
 const fromSearch = async (
   titles: string[],
   year: number | null,
   format: string | null
-): Promise<SynopsisResult> => {
-  if (!titles.length) return EMPTY_RESULT;
+): Promise<SearchOutcome> => {
+  if (!titles.length) return { result: EMPTY_RESULT, ref: null };
 
   const isMovie = format === "MOVIE";
   const path = isMovie ? "/search/movie" : "/search/tv";
@@ -267,10 +335,10 @@ const fromSearch = async (
     );
     const picked = pickResult(data?.results ?? [], year);
     const result = toResult(picked);
-    if (result.description) return result;
+    if (result.description) return { result, ref: null };
   }
 
-  return EMPTY_RESULT;
+  return { result: EMPTY_RESULT, ref: null };
 };
 
 export interface SynopsisQuery {
@@ -294,12 +362,22 @@ export const getPtBrSynopsis = async ({
   if (!process.env.TMDB_API_KEY) return EMPTY_RESULT;
 
   const mapping = await mappingWithinBudget();
-  const ref = mapping?.get(anilistId);
+  const mappedRef = mapping?.get(anilistId) ?? null;
 
-  if (ref) {
-    const mapped = await fromRef(ref);
-    if (mapped.description) return mapped;
+  let result = mappedRef ? await fromRef(mappedRef) : EMPTY_RESULT;
+  let ref = mappedRef;
+
+  if (!result.description) {
+    const searched = await fromSearch(titles, year, format);
+    if (searched.result.description) {
+      result = searched.result;
+      // A referência do mapeamento é mais confiável que a da busca.
+      ref = ref ?? searched.ref;
+    }
   }
 
-  return fromSearch(titles, year, format);
+  // Os episódios valem mesmo sem sinopse: são consultas independentes.
+  const episodeTitles = ref ? await fetchEpisodeTitles(ref) : {};
+
+  return { ...result, episodeTitles };
 };
