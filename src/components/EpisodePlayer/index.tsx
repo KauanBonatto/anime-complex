@@ -20,16 +20,11 @@ const PLAYER_STYLE = {
  * Alguns providers injetam anúncios que chamam `top.location` e arrastam a aba
  * inteira para o site deles depois de alguns segundos. Sem `allow-top-navigation`
  * o embed fica preso dentro do iframe e o player continua funcionando normalmente.
- *
- * O `allow-popups` entra porque esses players se pagam com aba de anúncio, e há
- * indício de que alguns se recusam a tocar quando não conseguem abrir uma. Ele
- * libera a aba nova, não a navegação da nossa — que é a trava que interessa.
  */
 const PLAYER_SANDBOX = [
   "allow-scripts",
   "allow-same-origin",
   "allow-presentation",
-  "allow-popups",
 ].join(" ");
 
 const PLAYER_PERMISSIONS =
