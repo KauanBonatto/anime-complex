@@ -1,5 +1,6 @@
 import {
   isWrappedPlayer,
+  refusesSandbox,
   listEpisodePlayers,
   unwrapPlayer,
 } from "@/utils/topAnimes";
@@ -89,6 +90,7 @@ const toProvider = (
     // Deixa de ser embed: agora é uma playlist tocada no nosso player.
     isEmbed: provider.is_embed && !proxied && !direct,
     isHls: proxied || direct,
+    isExternal: refusesSandbox(url),
     url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
   };
 };

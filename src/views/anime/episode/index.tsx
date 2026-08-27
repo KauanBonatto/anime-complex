@@ -25,9 +25,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Prioriza players sem anúncios e, entre eles, os embeds e as playlists HLS: os
- * links diretos de vídeo vêm com token do CDN e costumam responder 401 fora do
- * site de origem.
+ * Prioriza quem toca aqui dentro, depois os players sem anúncios e, entre eles,
+ * os embeds e as playlists HLS: os links diretos de vídeo vêm com token do CDN
+ * e costumam responder 401 fora do site de origem.
  */
 const isHosted = (provider: EpisodeProviderProps) =>
   provider.isEmbed || !!provider.isHls;
@@ -35,6 +35,7 @@ const isHosted = (provider: EpisodeProviderProps) =>
 const sortProviders = (providers: EpisodeProviderProps[]) =>
   [...providers].sort(
     (a, b) =>
+      Number(!!a.isExternal) - Number(!!b.isExternal) ||
       Number(a.hasAds) - Number(b.hasAds) ||
       Number(isHosted(b)) - Number(isHosted(a)),
   );
@@ -74,7 +75,10 @@ const AnimeEpisodeView = ({
       await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),
     );
     setProviders(episodeProviders);
-    setSelectedProvider(episodeProviders[0] ?? null);
+    // Os que só abrem em aba nova ficam de fora: eles não têm o que tocar aqui.
+    setSelectedProvider(
+      episodeProviders.find((provider) => !provider.isExternal) ?? null,
+    );
     setLoading(false);
   }, [animeId, episodeNumber]);
 
@@ -137,7 +141,7 @@ const AnimeEpisodeView = ({
               />
             )}
 
-            {!loading && selectedProvider && (
+            {!loading && !!providers.length && (
               <EpisodePlayer
                 providers={providers}
                 selectedProvider={selectedProvider}
@@ -146,7 +150,7 @@ const AnimeEpisodeView = ({
               />
             )}
 
-            {!loading && !selectedProvider && (
+            {!loading && !providers.length && (
               <Stack alignItems="center" gap={2}>
                 <Typography>
                   Nenhum player encontrado para este episódio.

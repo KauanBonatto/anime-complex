@@ -1,6 +1,7 @@
 import CrunchyrollChip from "@/components/CrunchyrollChip";
 import HlsVideo from "@/components/HlsVideo";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Box, Button, Stack, Tooltip, Typography } from "@mui/material";
@@ -58,14 +59,15 @@ const EpisodePlayer = ({
   crunchyroll,
 }: {
   providers: EpisodeProviderProps[];
-  selectedProvider: EpisodeProviderProps;
+  /** Ausente quando só há players que abrem em aba nova. */
+  selectedProvider: EpisodeProviderProps | null;
   onSelectProvider: (provider: EpisodeProviderProps) => void;
   /** Link oficial da Crunchyroll, quando o anime está no catálogo dela. */
   crunchyroll?: CrunchyrollLinkProps | null;
 }) => {
   const [playerFailed, setPlayerFailed] = useState(false);
 
-  useEffect(() => setPlayerFailed(false), [selectedProvider.url]);
+  useEffect(() => setPlayerFailed(false), [selectedProvider?.url]);
 
   const options = useMemo(() => buildOptions(providers), [providers]);
   // A Crunchyroll não toca aqui dentro, mas conta como opção de onde assistir.
@@ -73,7 +75,11 @@ const EpisodePlayer = ({
 
   return (
     <Box width="100%" textAlign="center">
-      {selectedProvider.isHls ? (
+      {!selectedProvider ? (
+        <Typography color="text.secondary" py={4}>
+          Os players deste episódio só abrem em uma aba nova.
+        </Typography>
+      ) : selectedProvider.isHls ? (
         <HlsVideo
           key={selectedProvider.url}
           src={selectedProvider.url}
@@ -102,7 +108,7 @@ const EpisodePlayer = ({
         />
       )}
 
-      {playerFailed && (
+      {playerFailed && selectedProvider && (
         <Typography variant="body2" color="error" mt={1}>
           O {selectedProvider.name} recusou a reprodução deste link.
           {hasChoice && " Tente outra opção na lista abaixo."}
@@ -122,7 +128,32 @@ const EpisodePlayer = ({
           aria-label="Players disponíveis"
         >
           {options.map((option) => {
-            const isPlaying = option.url === selectedProvider.url;
+            /**
+             * Player que se recusa a rodar sob `sandbox` não vira iframe: abrir
+             * numa aba nova o tira do nosso domínio, onde ele funciona, sem
+             * precisar afrouxar a trava dos outros embeds.
+             */
+            if (option.isExternal) {
+              return (
+                <Tooltip
+                  key={option.url}
+                  title="Este player só funciona fora do site; abre em uma aba nova"
+                >
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    href={option.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    endIcon={<OpenInNewIcon />}
+                  >
+                    {option.label}
+                  </Button>
+                </Tooltip>
+              );
+            }
+
+            const isPlaying = option.url === selectedProvider?.url;
 
             return (
               <Button

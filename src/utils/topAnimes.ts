@@ -25,6 +25,20 @@ const WRAPPER_PARAMS: Record<string, string> = {
 /** E o quinto avisa que aquele player caiu, sem vídeo nenhum atrás. */
 const OFFLINE_PLAYER = "topanimes.net/off";
 
+/**
+ * Estes players testam `document.domain = document.domain` e, quando a
+ * atribuição falha, trocam o próprio endereço por uma página de bloqueio. O
+ * erro vem da flag de sandbox, que o atributo liga por existir — nenhum token
+ * `allow-` a desliga —, então dentro do nosso iframe eles nunca vão tocar.
+ *
+ * Em vez de abrir mão da trava para todos os embeds, esses viram link: o
+ * usuário assiste numa aba nova, no domínio deles, onde não há sandbox nenhum.
+ */
+const SANDBOX_REFUSERS = ["filemoon.sx", "strp2p.com"];
+
+export const refusesSandbox = (url: string) =>
+  SANDBOX_REFUSERS.some((host) => url.includes(host));
+
 export const isWrappedPlayer = (url: string) =>
   WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
 
