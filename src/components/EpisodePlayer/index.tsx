@@ -108,6 +108,28 @@ const EpisodePlayer = ({
         />
       )}
 
+      {/*
+       * O `SANDBOX_REFUSERS` só conhece os hosts que já pegamos falhando, e
+       * quem entrar nessa lista amanhã vai travar dentro do quadro sem dizer
+       * nada — o iframe não avisa quando o conteúdo dele se recusa a rodar.
+       * Esta saída serve para qualquer embed: assistir no domínio de origem,
+       * onde não há sandbox, sem afrouxar a trava para todos os outros.
+       */}
+      {selectedProvider?.isEmbed && (
+        <Box mt={1}>
+          <Button
+            size="small"
+            href={selectedProvider.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            endIcon={<OpenInNewIcon fontSize="small" />}
+            sx={{ color: "text.disabled" }}
+          >
+            Não carregou? Abra em uma aba nova
+          </Button>
+        </Box>
+      )}
+
       {playerFailed && selectedProvider && (
         <Typography variant="body2" color="error" mt={1}>
           O {selectedProvider.name} recusou a reprodução deste link.
