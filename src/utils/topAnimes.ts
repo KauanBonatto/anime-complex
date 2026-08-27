@@ -100,6 +100,8 @@ const isGone = async (url: string) => {
       signal: AbortSignal.timeout(PROBE_TIMEOUT),
       headers: { "User-Agent": BROWSER_UA },
     });
+    // Só o status interessa, e do outro lado vem uma página inteira.
+    response.body?.cancel().catch(() => {});
     return response.status === 404 || response.status === 410;
   } catch (err) {
     // Timeout ou host fora do ar não provam nada sobre o arquivo.

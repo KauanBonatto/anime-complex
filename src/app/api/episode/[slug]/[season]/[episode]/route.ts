@@ -1,3 +1,4 @@
+import { createCache } from "@/utils/cache";
 import {
   isOfflinePlayer,
   isWrappedPlayer,
@@ -15,6 +16,28 @@ const SUGOI_API_URL = process.env.SUGOI_API_URL ?? "http://localhost:1010";
 
 // Os providers fazem scraping de sites externos e podem demorar.
 const REQUEST_TIMEOUT = 45_000;
+
+/**
+ * Montar esta lista é caro: o SugoiAPI raspa três sites e, no Top Animes, ainda
+ * baixamos a página do episódio e testamos cada player que ela oferece. O
+ * usuário, enquanto isso, vai e volta entre episódios o tempo todo.
+ *
+ * Quinze minutos cortam essa repetição sem servir link vencido: o que expira
+ * mais rápido nas respostas são os tokens dos vídeos diretos, e esses duram
+ * cerca de três horas.
+ */
+const PLAYERS_TTL = 15 * 60 * 1000;
+
+interface EpisodeResult {
+  providers: EpisodeProviderProps[];
+  unavailable?: boolean;
+}
+
+const playersCache = createCache<EpisodeResult>({
+  namespace: "episode-players",
+  ttl: PLAYERS_TTL,
+  maxEntries: 200,
+});
 
 export const dynamic = "force-dynamic";
 
@@ -37,25 +60,32 @@ export async function GET(
   sugoiUrl.searchParams.set("ignore_on_fail", "true");
   if (providerFilter) sugoiUrl.searchParams.set("provider", providerFilter);
 
+  // Uma lista vazia costuma ser o provider fora do ar, e não um episódio sem
+  // player: guardá-la deixaria a tela vazia até o cache vencer.
+  const result = await playersCache.resolve(
+    `${slug}/${season}/${episode}/${providerFilter ?? ""}`,
+    () => searchEpisode(sugoiUrl),
+    { shouldStore: ({ providers }) => providers.length > 0 }
+  );
+
+  return NextResponse.json(result);
+}
+
+const searchEpisode = async (sugoiUrl: URL): Promise<EpisodeResult> => {
   try {
     const response = await fetch(sugoiUrl, {
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
 
-    if (!response.ok) {
-      return NextResponse.json({ providers: [] }, { status: 200 });
-    }
+    if (!response.ok) return { providers: [] };
 
     const body = await response.json();
-    return NextResponse.json({ providers: await toProviders(body?.data) });
+    return { providers: await toProviders(body?.data) };
   } catch (err) {
-    return NextResponse.json(
-      { providers: [], unavailable: true },
-      { status: 200 }
-    );
+    return { providers: [], unavailable: true };
   }
-}
+};
 
 interface SugoiEpisode {
   error: boolean;
