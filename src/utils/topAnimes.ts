@@ -26,6 +26,21 @@ const WRAPPER_PARAMS: Record<string, string> = {
 const OFFLINE_PLAYER = "topanimes.net/off";
 
 /**
+ * Hosts que saíram do ar de vez e cujo endereço o site ainda oferece. O
+ * rogeriobetin.com — de onde vinham os players que a página chama de NOA e AON
+ * — expirou e hoje é uma página de venda de domínio: responde 200, então o
+ * teste de 404 lá embaixo o deixa passar, e o usuário recebia "this domain may
+ * be for sale" dentro do quadro do vídeo.
+ *
+ * Detectar o estacionamento pelo conteúdo seria mais geral, mas não se sustenta:
+ * nos caminhos profundos esse host serve antes uma página de fingerprint que só
+ * cai no anúncio depois de um redirect em JS, que daqui não dá para seguir.
+ * Uma lista precisa de manutenção quando outro host cair — em troca, não custa
+ * requisição nenhuma e não erra.
+ */
+const DEAD_HOSTS = ["rogeriobetin.com"];
+
+/**
  * Estes players testam `document.domain = document.domain` e, quando a
  * atribuição falha, trocam o próprio endereço por uma página de bloqueio. O
  * erro vem da flag de sandbox, que o atributo liga por existir — nenhum token
@@ -62,7 +77,15 @@ export const showsAds = (url: string) =>
 export const isWrappedPlayer = (url: string) =>
   WRAPPED_PLAYERS.some((wrapper) => url.includes(wrapper));
 
-export const isOfflinePlayer = (url: string) => url.includes(OFFLINE_PLAYER);
+/** Endereço que não tem vídeo nenhum do outro lado, sem precisar perguntar. */
+export const isUnplayable = (url: string) => {
+  const embed = unwrapPlayer(url);
+
+  return (
+    embed.includes(OFFLINE_PLAYER) ||
+    DEAD_HOSTS.some((host) => hostOf(embed).includes(host))
+  );
+};
 
 export const unwrapPlayer = (url: string) => {
   const wrapper = Object.keys(WRAPPER_PARAMS).find((key) => url.includes(key));
@@ -153,7 +176,7 @@ export const listEpisodePlayers = async (
       label: labels.get(nume) || null,
       url: EMBED_SRC.exec(box)?.[1] ?? "",
     }))
-    .filter(({ url }) => !!url && !isOfflinePlayer(url));
+    .filter(({ url }) => !!url && !isUnplayable(url));
 
   // Os embrulhos que o /api/stream resolve ficam de fora do teste: quem
   // responde por eles é a página do player, não o endereço em si.

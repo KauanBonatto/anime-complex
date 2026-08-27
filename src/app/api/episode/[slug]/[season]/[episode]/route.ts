@@ -1,6 +1,6 @@
 import { createCache } from "@/utils/cache";
 import {
-  isOfflinePlayer,
+  isUnplayable,
   isWrappedPlayer,
   refusesSandbox,
   listEpisodePlayers,
@@ -143,13 +143,13 @@ const expandProvider = async (
   const episodes = validEpisodes(provider);
   /**
    * A API não distingue um player de um aviso de que o player caiu, então o
-   * endereço cru dela pode ser a própria página de "está offline" — que não
-   * pode virar botão nem quando é tudo o que sobrou.
+   * endereço cru dela pode ser a própria página de "está offline" — ou o host
+   * que já morreu. Nada disso pode virar botão, nem quando é tudo o que sobrou.
    */
   const fallback = () =>
     episodes
       .map((episode) => episode.episode as string)
-      .filter((url) => !isOfflinePlayer(url))
+      .filter((url) => !isUnplayable(url))
       .map((url) => toProvider(provider, url));
 
   if (provider.slug !== TOP_ANIMES || !episodes.length) return fallback();
