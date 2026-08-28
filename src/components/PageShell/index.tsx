@@ -51,6 +51,11 @@ const PageShell = ({
       sx={{
         minHeight: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
         borderRadius: 0,
+        // O Card do MUI vem com overflow: hidden, o que faz dele o ancestral
+        // rolável mais próximo de tudo que está dentro — e um `position:
+        // sticky` passa a ser calculado contra um contêiner que nunca rola,
+        // saindo do lugar. Nada aqui precisa de recorte.
+        overflow: "visible",
         px: { xs: 2, sm: 3, md: 5 },
         py: { xs: 3, md: 5 },
         ...(centered && { display: "flex", flexDirection: "column" }),

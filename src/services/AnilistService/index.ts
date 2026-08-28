@@ -37,7 +37,7 @@ const LIST_TTL = ONE_HOUR;
 
 /** Listas paginadas: populares, recentes e buscas. */
 const listCache = createCache<ResponseApiProps>({
-  namespace: "anilist:list",
+  namespace: "anilist:list:v2",
   ttl: LIST_TTL,
   persist: true,
 });
@@ -375,6 +375,7 @@ class AnilistServiceClass {
         media.coverImage?.extraLarge ??
         media.coverImage?.large ??
         DEFAULT_COVER,
+      bannerImage: media.bannerImage ?? null,
       genres: media.genres ?? [],
       releaseDate: this.toReleaseDate(media),
       // O AniList devolve a nota de 0 a 100; exibimos no formato 0 a 10.

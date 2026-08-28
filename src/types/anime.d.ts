@@ -12,6 +12,8 @@ interface AnimeProps {
   title: string;
   titleEnglish?: string | null;
   image: string;
+  /** Arte deitada. Só vem nas listas que pedem por ela. */
+  bannerImage?: string | null;
   genres?: string[];
   releaseDate?: string | null;
   /** Nota média da comunidade, normalizada de 0 a 10. */

@@ -45,6 +45,15 @@ const AnimeGrid = ({
 
   const isRelease = variant === "release";
 
+  /**
+   * O card de lançamento leva direto ao player do episódio anunciado; passar
+   * pela ficha só para clicar no mesmo episódio de novo seria um desvio.
+   */
+  const cardHref = (anime: AnimeProps) =>
+    isRelease && anime.episodeNumber
+      ? `/anime/${anime.id}/${anime.episodeNumber}`
+      : `/${media}/${anime.id}`;
+
   // Colunas fluidas: os cards nunca encostam porque o gap é fixo e a largura
   // de cada coluna se ajusta ao espaço disponível. O card de lançamento é
   // horizontal, então pede colunas bem mais largas que o da capa.
@@ -53,7 +62,7 @@ const AnimeGrid = ({
     width: "100%",
     gap: isRelease ? 2 : 3,
     gridTemplateColumns: isRelease
-      ? "repeat(auto-fill, minmax(300px, 1fr))"
+      ? "repeat(auto-fill, minmax(320px, 1fr))"
       : "repeat(auto-fill, minmax(180px, 1fr))",
     [theme.breakpoints.down("sm")]: {
       gap: 2,
@@ -85,16 +94,12 @@ const AnimeGrid = ({
         {loading &&
           SKELETON_PLACEHOLDERS.map((_, index) =>
             isRelease ? (
-              <Box key={index} display="flex" gap={1.5} width="100%" p={1}>
+              <Box key={index} width="100%">
                 <Skeleton
                   variant="rounded"
-                  sx={{ flexShrink: 0, width: 72, aspectRatio: "180 / 254" }}
+                  sx={{ width: "100%", height: "auto", aspectRatio: "16 / 9" }}
                 />
-                <Box flexGrow={1}>
-                  <Skeleton variant="text" />
-                  <Skeleton variant="text" sx={{ width: "60%" }} />
-                  <Skeleton variant="text" sx={{ width: "35%" }} />
-                </Box>
+                <Skeleton variant="text" sx={{ mt: 1 }} />
               </Box>
             ) : (
               <Box key={index} width="100%">
@@ -110,7 +115,7 @@ const AnimeGrid = ({
 
         {hasResults &&
           animeData.results.map((anime, index) => (
-            <Link key={anime.id + index} href={`/${media}/${anime.id}`}>
+            <Link key={anime.id + index} href={cardHref(anime)}>
               <AnimeCard anime={anime} media={media} variant={variant} />
             </Link>
           ))}

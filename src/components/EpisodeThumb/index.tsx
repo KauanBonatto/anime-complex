@@ -2,12 +2,16 @@ import { Box, Typography } from "@mui/material";
 import Image from "next/image";
 
 /**
- * Único host de imagem de episódio liberado no next.config. Os thumbnails que
- * vêm do AniList são servidos por hosts variados da Crunchyroll, que mudam sem
- * aviso — liberar todos eles no `remotePatterns` seria abrir a otimização de
- * imagem para domínios de terceiros, então esses caem para <img> puro.
+ * Hosts liberados no next.config e, portanto, elegíveis ao next/image. Os
+ * thumbnails que vêm do AniList são servidos por hosts variados da Crunchyroll,
+ * que mudam sem aviso — liberar todos eles no `remotePatterns` seria abrir a
+ * otimização de imagem para domínios de terceiros, então esses caem para <img>
+ * puro, como o AnimeTrailer já faz com a capa do YouTube.
  */
-const OPTIMIZED_HOST = "https://image.tmdb.org/";
+const OPTIMIZED_HOSTS = ["https://image.tmdb.org/", "https://s4.anilist.co/"];
+
+const isOptimized = (src: string) =>
+  OPTIMIZED_HOSTS.some((host) => src.startsWith(host));
 
 interface EpisodeThumbProps {
   src?: string | null;
@@ -43,7 +47,7 @@ const EpisodeThumb = ({
     }}
   >
     {src ? (
-      src.startsWith(OPTIMIZED_HOST) ? (
+      isOptimized(src) ? (
         <Image
           className="episode-thumb"
           src={src}

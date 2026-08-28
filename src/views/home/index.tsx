@@ -5,11 +5,16 @@ import FilterBar from "@/components/FilterBar";
 import HomeHero from "@/components/HomeHero";
 import PageShell from "@/components/PageShell";
 import AnilistService from "@/services/AnilistService";
+import { pickHighlights } from "@/utils/anime";
 import { Box, Typography } from "@mui/material";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+/** Obras no carrossel de destaque. Poucas, para o revezamento ter fim. */
+const HIGHLIGHT_COUNT = 6;
 
 const HomeView = () => {
   const [filters, setFilters] = useState<string[]>([]);
+  const [highlights, setHighlights] = useState<AnimeProps[]>([]);
   const [popularLoading, setPopularLoading] = useState(true);
   const [recentLoading, setRecentLoading] = useState(true);
   const [popularAnimeList, setPopularAnimeList] =
@@ -44,12 +49,35 @@ const HomeView = () => {
   );
 
   const filtersToken = filters.join(",");
-  // O destaque é o primeiro dos populares, que a própria home já carregou.
-  const featured = popularAnimeList?.results?.[0];
+
+  /**
+   * O destaque é sorteado uma vez por conjunto de filtros e guardado, e não
+   * derivado das listas a cada render: elas são substituídas quando o usuário
+   * pagina, e o carrossel trocaria de obras no meio da navegação.
+   */
+  useEffect(() => {
+    setHighlights([]);
+  }, [filtersToken]);
+
+  useEffect(() => {
+    if (highlights.length) return;
+    // Espera as duas fontes para o sorteio poder misturar as duas.
+    if (!popularAnimeList?.results?.length || !recentAnimeList?.results?.length) {
+      return;
+    }
+
+    setHighlights(
+      pickHighlights(
+        popularAnimeList.results,
+        recentAnimeList.results,
+        HIGHLIGHT_COUNT
+      )
+    );
+  }, [popularAnimeList, recentAnimeList, highlights.length]);
 
   return (
     <PageShell loading={popularLoading || recentLoading}>
-      <HomeHero anime={featured} />
+      <HomeHero animes={highlights} />
 
       <FilterBar filters={filters} setFilters={setFilters} />
 

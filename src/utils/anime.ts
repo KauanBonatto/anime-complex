@@ -142,6 +142,53 @@ export const airingDateLabel = (airingAt: number) => {
   return `${day} às ${hour}`;
 };
 
+/** Embaralhamento de Fisher-Yates, sobre uma cópia. */
+const shuffle = <T,>(items: T[]): T[] => {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+/**
+ * Obras para o destaque da home: metade do catálogo popular, metade da grade
+ * de exibição, embaralhadas.
+ *
+ * A divisão é feita antes do sorteio de propósito — sortear sobre a soma das
+ * duas listas devolveria quase sempre só populares, porque essa lista chega
+ * primeiro e costuma ser a maior. Quando uma das fontes não enche a cota, a
+ * outra completa.
+ */
+export const pickHighlights = (
+  popular: AnimeProps[],
+  recent: AnimeProps[],
+  max: number
+): AnimeProps[] => {
+  const seen = new Set<string>();
+  const take = (list: AnimeProps[], limit: number) => {
+    const picked: AnimeProps[] = [];
+    if (limit <= 0) return picked;
+
+    for (const anime of shuffle(list)) {
+      if (picked.length >= limit) break;
+      // Uma obra em exibição também é popular; sem isto ela poderia aparecer
+      // duas vezes no mesmo carrossel.
+      if (seen.has(anime.id)) continue;
+      seen.add(anime.id);
+      picked.push(anime);
+    }
+    return picked;
+  };
+
+  const fromPopular = take(popular, Math.ceil(max / 2));
+  const fromRecent = take(recent, max - fromPopular.length);
+  const sobra = take(popular, max - fromPopular.length - fromRecent.length);
+
+  return shuffle([...fromPopular, ...fromRecent, ...sobra]);
+};
+
 /**
  * "21 de setembro de 2025" — a data de exibição de um episódio.
  *

@@ -9,6 +9,7 @@ const ANIME_FIELDS = `
     large
     extraLarge
   }
+  bannerImage
   averageScore
   popularity
   favourites
@@ -95,7 +96,6 @@ export const ANIME_DETAILS_QUERY = `
   query AnimeDetails($id: Int) {
     Media(id: $id, type: ANIME) {
       ${ANIME_FIELDS}
-      bannerImage
       duration
       trailer {
         id

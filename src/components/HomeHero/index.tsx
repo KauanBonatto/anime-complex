@@ -4,51 +4,105 @@ import { formatScore, scoreColor } from "@/components/AnimeScore";
 import AnilistService from "@/services/AnilistService";
 import TmdbService from "@/services/TmdbService";
 import { genreLabel } from "@/utils/anime";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Box, Button, Chip, Skeleton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  Skeleton,
+  Stack,
+  Typography,
+  alpha,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-const HERO_HEIGHT = { xs: 260, sm: 300, md: 340 };
+const HERO_HEIGHT = { xs: 320, sm: 380, md: 440 };
+
+/** Tempo de cada obra em cena antes de o carrossel virar sozinho. */
+const AUTOPLAY_MS = 7000;
 
 /**
  * Destaque do topo da home. A página abria direto no filtro de gêneros, sem
- * nenhum ponto focal — aqui o anime mais popular do momento vira a capa.
+ * nenhum ponto focal — aqui um punhado de obras se reveza na capa.
  *
- * Os dados básicos vêm da lista que a home já carregou; só o banner e a
- * sinopse exigem a ficha completa, que é buscada à parte e cai num degradê
- * liso enquanto não chega.
+ * Os dados básicos vêm das listas que a home já carregou; só o banner e a
+ * sinopse exigem a ficha completa. Ela é buscada sob demanda, para a obra em
+ * cena e a seguinte: carregar as seis de uma vez gastaria requisições de um
+ * carrossel que a maioria não vai percorrer até o fim.
  */
-const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
-  const [details, setDetails] = useState<AnimeDetailsProps | null>(null);
+const HomeHero = ({ animes }: { animes: AnimeProps[] }) => {
+  const theme = useTheme();
+  const reduzirMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
 
+  const [index, setIndex] = useState(0);
+  const [pausado, setPausado] = useState(false);
+  const [fichas, setFichas] = useState<Record<string, AnimeDetailsProps | null>>(
+    {}
+  );
+
+  const total = animes.length;
+
+  // A lista pode encolher quando os filtros mudam; sem isto o índice ficaria
+  // apontando para uma posição que não existe mais.
   useEffect(() => {
-    if (!anime?.id) return;
+    setIndex(0);
+  }, [total]);
 
-    let active = true;
-    setDetails(null);
+  const irPara = useCallback(
+    (proximo: number) => {
+      if (!total) return;
+      setIndex(((proximo % total) + total) % total);
+    },
+    [total]
+  );
 
-    AnilistService.getAnimeDetails(anime.id)
-      // A sinopse do AniList vem em inglês; o resto do site já mostra a versão
-      // em pt-BR do TMDB, e o destaque não pode ser a exceção.
-      .then((data) => (data ? TmdbService.localize(data) : null))
-      .then((data) => {
-        // A home troca de destaque quando os filtros mudam; sem isso uma
-        // resposta atrasada sobrescreveria o anime já exibido.
-        if (active) setDetails(data);
-      })
-      .catch(() => {
-        // O destaque é enfeite: sem ele a home segue inteira.
-      });
+  /** Busca a ficha da obra em cena e a da próxima, uma única vez cada. */
+  useEffect(() => {
+    if (!total) return;
+
+    let ativo = true;
+    const alvos = [animes[index], animes[(index + 1) % total]];
+
+    alvos.forEach((anime) => {
+      if (!anime || anime.id in fichas) return;
+
+      // Marca antes de resolver para duas passagens não pedirem o mesmo.
+      setFichas((atual) => ({ ...atual, [anime.id]: null }));
+
+      AnilistService.getAnimeDetails(anime.id)
+        // A sinopse do AniList vem em inglês; o resto do site já mostra a
+        // versão em pt-BR do TMDB, e o destaque não pode ser a exceção.
+        .then((data) => (data ? TmdbService.localize(data) : null))
+        .then((data) => {
+          if (ativo && data) setFichas((atual) => ({ ...atual, [anime.id]: data }));
+        })
+        .catch(() => {
+          // O destaque é enfeite: sem ele a home segue inteira.
+        });
+    });
 
     return () => {
-      active = false;
+      ativo = false;
     };
-  }, [anime?.id]);
+  }, [animes, index, total, fichas]);
 
-  if (!anime) {
+  /** Troca sozinho, menos quando o ponteiro está em cima ou há foco dentro. */
+  useEffect(() => {
+    if (total < 2 || pausado || reduzirMovimento) return;
+
+    const timer = setInterval(() => irPara(index + 1), AUTOPLAY_MS);
+    return () => clearInterval(timer);
+  }, [index, irPara, pausado, reduzirMovimento, total]);
+
+  if (!total) {
     return (
       <Skeleton
         variant="rounded"
@@ -56,9 +110,6 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
       />
     );
   }
-
-  const banner = details?.bannerImage;
-  const genres = (anime.genres ?? []).slice(0, 3);
 
   return (
     <Box
@@ -70,18 +121,119 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
         overflow: "hidden",
         backgroundColor: "primary.main",
       }}
+      onMouseEnter={() => setPausado(true)}
+      onMouseLeave={() => setPausado(false)}
+      onFocusCapture={() => setPausado(true)}
+      onBlurCapture={() => setPausado(false)}
+      aria-roledescription="carrossel"
+      aria-label="Obras em destaque"
     >
-      {banner && (
-        <Image
-          priority
-          fill
-          src={banner}
-          alt=""
-          aria-hidden
-          sizes="100vw"
-          style={{ objectFit: "cover" }}
+      {animes.map((anime, posicao) => (
+        <Slide
+          key={anime.id}
+          anime={anime}
+          detalhes={fichas[anime.id] ?? null}
+          ativo={posicao === index}
+          prioridade={posicao === 0}
         />
+      ))}
+
+      {total > 1 && (
+        <>
+          <Seta lado="left" aoClicar={() => irPara(index - 1)} rotulo="Anterior" />
+          <Seta lado="right" aoClicar={() => irPara(index + 1)} rotulo="Próximo" />
+
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              position: "absolute",
+              bottom: 12,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 3,
+            }}
+          >
+            {animes.map((anime, posicao) => (
+              <Box
+                key={anime.id}
+                component="button"
+                type="button"
+                aria-label={`Ir para ${anime.title}`}
+                aria-current={posicao === index}
+                onClick={() => irPara(posicao)}
+                sx={{
+                  width: posicao === index ? 22 : 8,
+                  height: 8,
+                  p: 0,
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  transition: ".25s",
+                  backgroundColor: (t) =>
+                    posicao === index
+                      ? t.palette.common.white
+                      : alpha(t.palette.common.white, 0.45),
+                }}
+              />
+            ))}
+          </Stack>
+        </>
       )}
+    </Box>
+  );
+};
+
+/** Uma obra em cena. Todas ficam montadas e só a ativa fica visível. */
+const Slide = ({
+  anime,
+  detalhes,
+  ativo,
+  prioridade,
+}: {
+  anime: AnimeProps;
+  detalhes: AnimeDetailsProps | null;
+  ativo: boolean;
+  prioridade: boolean;
+}) => {
+  const banner = detalhes?.bannerImage ?? anime.bannerImage ?? null;
+  const generos = (anime.genres ?? []).slice(0, 3);
+  // Boa parte das obras em exibição ainda não tem arte deitada cadastrada no
+  // AniList, e sem isto o slide delas virava um retângulo roxo vazio. A capa
+  // entra desfocada no fundo e nítida como pôster, então todo slide tem imagem.
+  const usaCapaDeFundo = !banner;
+
+  return (
+    <Box
+      // `inert` não é confiável em todos os navegadores ainda, então o slide
+      // fora de cena sai da navegação por teclado pelo próprio hidden.
+      aria-hidden={!ativo}
+      sx={{
+        position: "absolute",
+        inset: 0,
+        opacity: ativo ? 1 : 0,
+        transition: "opacity .5s ease",
+        pointerEvents: ativo ? "auto" : "none",
+        visibility: ativo ? "visible" : "hidden",
+      }}
+    >
+      <Image
+        fill
+        src={banner ?? anime.image}
+        alt=""
+        aria-hidden
+        sizes="100vw"
+        priority={prioridade}
+        style={{
+          objectFit: "cover",
+          ...(usaCapaDeFundo && {
+            filter: "blur(24px)",
+            // A capa é estreita: ampliá-la evita as bordas transparentes que o
+            // desfoque deixa à mostra.
+            transform: "scale(1.2)",
+          }),
+        }}
+      />
 
       {/* O texto fica sobre a imagem, então precisa de um véu que garanta o
           contraste em qualquer banner — inclusive nos bem claros. */}
@@ -96,6 +248,32 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
         }}
       />
 
+      {/* Pôster nítido, a partir de md — no celular ele roubaria a largura do
+          texto sem acrescentar informação. */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: "50%",
+          right: 40,
+          transform: "translateY(-50%)",
+          width: 190,
+          aspectRatio: "180 / 254",
+          borderRadius: 2,
+          overflow: "hidden",
+          boxShadow: 6,
+          display: { xs: "none", md: "block" },
+        }}
+      >
+        <Image
+          fill
+          src={anime.image}
+          alt=""
+          aria-hidden
+          sizes="190px"
+          style={{ objectFit: "cover" }}
+        />
+      </Box>
+
       <Stack
         spacing={1.5}
         sx={{
@@ -105,7 +283,8 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
           alignItems: "flex-start",
           px: { xs: 2.5, sm: 4, md: 5 },
           py: 3,
-          maxWidth: { xs: "100%", md: "62%" },
+          pb: { xs: 5, md: 6 },
+          maxWidth: { xs: "100%", md: "58%" },
         }}
       >
         <Typography
@@ -145,11 +324,22 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
               </Typography>
             </Stack>
           )}
-          {genres.map((genre) => (
+          {!!anime.episodeNumber && (
             <Chip
-              key={genre}
               size="small"
-              label={genreLabel(genre)}
+              label={`EP ${anime.episodeNumber} no ar`}
+              sx={{
+                color: "common.white",
+                backgroundColor: (t) => alpha(t.palette.common.white, 0.2),
+                fontWeight: 600,
+              }}
+            />
+          )}
+          {generos.map((genero) => (
+            <Chip
+              key={genero}
+              size="small"
+              label={genreLabel(genero)}
               sx={{
                 color: "common.white",
                 borderColor: "common.white",
@@ -160,13 +350,13 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
           ))}
         </Stack>
 
-        {details === null ? (
+        {detalhes === null ? (
           <Skeleton
             variant="text"
             sx={{ width: { xs: "90%", md: 520 }, bgcolor: "rgba(255,255,255,.2)" }}
           />
         ) : (
-          !!details.description && (
+          !!detalhes.description && (
             <Typography
               variant="body2"
               color="common.white"
@@ -178,7 +368,7 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
                 opacity: 0.85,
               }}
             >
-              {details.description}
+              {detalhes.description}
             </Typography>
           )
         )}
@@ -187,8 +377,8 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
           component={Link}
           href={`/anime/${anime.id}`}
           variant="contained"
-          color="secondary"
           startIcon={<PlayArrowIcon />}
+          tabIndex={ativo ? 0 : -1}
           sx={{
             mt: 0.5,
             backgroundColor: "common.white",
@@ -203,5 +393,33 @@ const HomeHero = ({ anime }: { anime?: AnimeProps }) => {
     </Box>
   );
 };
+
+const Seta = ({
+  lado,
+  aoClicar,
+  rotulo,
+}: {
+  lado: "left" | "right";
+  aoClicar: () => void;
+  rotulo: string;
+}) => (
+  <IconButton
+    onClick={aoClicar}
+    aria-label={rotulo}
+    sx={{
+      position: "absolute",
+      top: "50%",
+      [lado]: 8,
+      transform: "translateY(-50%)",
+      zIndex: 3,
+      color: "common.white",
+      backgroundColor: (t) => alpha(t.palette.common.black, 0.35),
+      ":hover": { backgroundColor: (t) => alpha(t.palette.common.black, 0.55) },
+      display: { xs: "none", sm: "inline-flex" },
+    }}
+  >
+    {lado === "left" ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+  </IconButton>
+);
 
 export default HomeHero;
