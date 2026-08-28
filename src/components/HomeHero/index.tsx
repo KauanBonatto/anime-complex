@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const HERO_HEIGHT = { xs: 320, sm: 380, md: 440 };
 
@@ -44,9 +44,22 @@ const HomeHero = ({ animes }: { animes: AnimeProps[] }) => {
 
   const [index, setIndex] = useState(0);
   const [pausado, setPausado] = useState(false);
-  const [fichas, setFichas] = useState<Record<string, AnimeDetailsProps | null>>(
+  /**
+   * Ficha de cada obra por id. Ausente quer dizer "ainda buscando"; "vazio"
+   * quer dizer que a busca terminou sem nada — sem essa distinção uma obra sem
+   * ficha ficaria com o esqueleto da sinopse para sempre.
+   */
+  const [fichas, setFichas] = useState<Record<string, AnimeDetailsProps | "vazio">>(
     {}
   );
+
+  /**
+   * Quem já foi pedido. Fica num ref, e não no estado, porque marcar o pedido
+   * não pode disparar uma nova renderização: o efeito que busca depende desta
+   * marca e voltaria a rodar, cancelando a própria requisição que acabou de
+   * disparar — foi o que manteve a sinopse invisível em todos os slides.
+   */
+  const pedidos = useRef<Set<string>>(new Set());
 
   const total = animes.length;
 
@@ -64,35 +77,34 @@ const HomeHero = ({ animes }: { animes: AnimeProps[] }) => {
     [total]
   );
 
+  // Um elenco novo (troca de filtros) reabre a temporada de pedidos.
+  useEffect(() => {
+    pedidos.current = new Set();
+    setFichas({});
+  }, [animes]);
+
   /** Busca a ficha da obra em cena e a da próxima, uma única vez cada. */
   useEffect(() => {
     if (!total) return;
 
-    let ativo = true;
-    const alvos = [animes[index], animes[(index + 1) % total]];
-
-    alvos.forEach((anime) => {
-      if (!anime || anime.id in fichas) return;
-
-      // Marca antes de resolver para duas passagens não pedirem o mesmo.
-      setFichas((atual) => ({ ...atual, [anime.id]: null }));
+    [animes[index], animes[(index + 1) % total]].forEach((anime) => {
+      if (!anime || pedidos.current.has(anime.id)) return;
+      pedidos.current.add(anime.id);
 
       AnilistService.getAnimeDetails(anime.id)
-        // A sinopse do AniList vem em inglês; o resto do site já mostra a
-        // versão em pt-BR do TMDB, e o destaque não pode ser a exceção.
+        // O TmdbService devolve a sinopse em pt-BR quando existe e mantém a do
+        // AniList, em inglês, quando não existe — o destaque nunca fica sem
+        // texto por falta de tradução.
         .then((data) => (data ? TmdbService.localize(data) : null))
-        .then((data) => {
-          if (ativo && data) setFichas((atual) => ({ ...atual, [anime.id]: data }));
-        })
-        .catch(() => {
+        .then((data) =>
+          setFichas((atual) => ({ ...atual, [anime.id]: data ?? "vazio" }))
+        )
+        .catch(() =>
           // O destaque é enfeite: sem ele a home segue inteira.
-        });
+          setFichas((atual) => ({ ...atual, [anime.id]: "vazio" }))
+        );
     });
-
-    return () => {
-      ativo = false;
-    };
-  }, [animes, index, total, fichas]);
+  }, [animes, index, total]);
 
   /** Troca sozinho, menos quando o ponteiro está em cima ou há foco dentro. */
   useEffect(() => {
@@ -132,7 +144,7 @@ const HomeHero = ({ animes }: { animes: AnimeProps[] }) => {
         <Slide
           key={anime.id}
           anime={anime}
-          detalhes={fichas[anime.id] ?? null}
+          detalhes={fichas[anime.id]}
           ativo={posicao === index}
           prioridade={posicao === 0}
         />
@@ -192,11 +204,12 @@ const Slide = ({
   prioridade,
 }: {
   anime: AnimeProps;
-  detalhes: AnimeDetailsProps | null;
+  detalhes: AnimeDetailsProps | "vazio" | undefined;
   ativo: boolean;
   prioridade: boolean;
 }) => {
-  const banner = detalhes?.bannerImage ?? anime.bannerImage ?? null;
+  const ficha = detalhes === "vazio" ? null : detalhes;
+  const banner = ficha?.bannerImage ?? anime.bannerImage ?? null;
   const generos = (anime.genres ?? []).slice(0, 3);
   // Boa parte das obras em exibição ainda não tem arte deitada cadastrada no
   // AniList, e sem isto o slide delas virava um retângulo roxo vazio. A capa
@@ -350,13 +363,13 @@ const Slide = ({
           ))}
         </Stack>
 
-        {detalhes === null ? (
+        {detalhes === undefined ? (
           <Skeleton
             variant="text"
             sx={{ width: { xs: "90%", md: 520 }, bgcolor: "rgba(255,255,255,.2)" }}
           />
         ) : (
-          !!detalhes.description && (
+          !!ficha?.description && (
             <Typography
               variant="body2"
               color="common.white"
@@ -368,7 +381,7 @@ const Slide = ({
                 opacity: 0.85,
               }}
             >
-              {detalhes.description}
+              {ficha.description}
             </Typography>
           )
         )}
