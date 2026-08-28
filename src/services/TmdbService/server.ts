@@ -255,6 +255,23 @@ const toEpoch = (date?: string | null): number | null => {
  * Um episódio entra na lista mesmo sem nome traduzido, desde que traga imagem,
  * data ou sinopse: o card usa o número como título e aproveita o resto.
  */
+type TmdbRawEpisode = NonNullable<TmdbSeason["episodes"]>[number];
+
+/** Converte um episódio cru do TMDB, já sob o número usado na tela. */
+const toEpisode = (raw: TmdbRawEpisode, number: number): TmdbEpisode | null => {
+  const name = text(raw.name);
+  const title = name && !isGenericEpisodeName(name) ? name : null;
+  const stillPath = text(raw.still_path);
+  const thumbnail = stillPath ? `${STILL_BASE_URL}${stillPath}` : null;
+  const airedAt = toEpoch(raw.air_date);
+  const overview = text(raw.overview);
+  const duration = raw.runtime && raw.runtime > 0 ? raw.runtime : null;
+
+  if (!title && !thumbnail && !airedAt && !overview) return null;
+
+  return { number, title, thumbnail, airedAt, duration, overview };
+};
+
 const fetchEpisodes = async (
   ref: TmdbRef
 ): Promise<Record<number, TmdbEpisode>> => {
@@ -265,34 +282,68 @@ const fetchEpisodes = async (
   );
 
   const episodes: Record<number, TmdbEpisode> = {};
-  for (const episode of season?.episodes ?? []) {
-    if (!episode.episode_number) continue;
+  for (const raw of season?.episodes ?? []) {
+    if (!raw.episode_number) continue;
 
     // Traz a numeração do TMDB para a do AniList, que é a exibida na tela.
-    const number = episode.episode_number - ref.episodeOffset;
+    const number = raw.episode_number - ref.episodeOffset;
     if (number <= 0) continue;
 
-    const name = text(episode.name);
-    const title = name && !isGenericEpisodeName(name) ? name : null;
-    const stillPath = text(episode.still_path);
-    const thumbnail = stillPath ? `${STILL_BASE_URL}${stillPath}` : null;
-    const airedAt = toEpoch(episode.air_date);
-    const overview = text(episode.overview);
-    const duration = episode.runtime && episode.runtime > 0 ? episode.runtime : null;
-
-    if (!title && !thumbnail && !airedAt && !overview) continue;
-
-    episodes[number] = {
-      number,
-      title,
-      thumbnail,
-      airedAt,
-      duration,
-      overview,
-    };
+    const episode = toEpisode(raw, number);
+    if (episode) episodes[number] = episode;
   }
 
   return episodes;
+};
+
+interface TmdbShow {
+  seasons?: { season_number?: number; episode_count?: number }[];
+}
+
+/**
+ * Procura um episódio nas outras temporadas da série.
+ *
+ * A tabela de equivalência aponta uma temporada só, o que basta para os animes
+ * que o AniList fatia em obras por temporada. Já as séries que correm sem
+ * parar — One Piece, por exemplo — são uma obra única no AniList, com numeração
+ * contínua, enquanto o TMDB as divide em vinte e tantas temporadas: o episódio
+ * 1175 existe, mas não na temporada apontada.
+ *
+ * O intervalo cumulativo de episódios diz qual temporada deveria conter o
+ * número pedido, e só ela é consultada. Dentro dela as duas leituras são
+ * aceitas, porque o TMDB numera umas séries pelo absoluto e outras reiniciando
+ * em 1 a cada temporada.
+ */
+const findEpisodeAcrossSeasons = async (
+  ref: TmdbRef,
+  target: number
+): Promise<TmdbEpisode | null> => {
+  const show = await tmdbRequest<TmdbShow>(`/tv/${ref.id}`);
+  const seasons = (show?.seasons ?? []).filter(
+    (season) => (season.season_number ?? 0) > 0
+  );
+
+  let previous = 0;
+  for (const season of seasons) {
+    const first = previous + 1;
+    previous += season.episode_count ?? 0;
+    if (target < first || target > previous) continue;
+    // A temporada apontada pelo mapeamento já foi consultada e não tinha.
+    if (season.season_number === (ref.season ?? 1)) return null;
+
+    const data = await tmdbRequest<TmdbSeason>(
+      `/tv/${ref.id}/season/${season.season_number}`
+    );
+    const raw =
+      data?.episodes?.find((item) => item.episode_number === target) ??
+      data?.episodes?.find(
+        (item) => item.episode_number === target - first + 1
+      );
+
+    return raw ? toEpisode(raw, target) : null;
+  }
+
+  return null;
 };
 
 const fromRef = async (ref: TmdbRef): Promise<SynopsisResult> => {
@@ -398,6 +449,12 @@ export interface SynopsisQuery {
   titles: string[];
   year: number | null;
   format: string | null;
+  /**
+   * Episódio que o chamador precisa. Quando ele não está na temporada
+   * apontada pelo mapeamento, as outras temporadas da série são consultadas
+   * atrás dele — busca que só vale a pena para um alvo conhecido.
+   */
+  episode?: number | null;
 }
 
 /**
@@ -410,6 +467,7 @@ export const getPtBrSynopsis = async ({
   titles,
   year,
   format,
+  episode,
 }: SynopsisQuery): Promise<SynopsisResult> => {
   if (!process.env.TMDB_API_KEY) return EMPTY_RESULT;
 
@@ -430,6 +488,11 @@ export const getPtBrSynopsis = async ({
 
   // Os episódios valem mesmo sem sinopse: são consultas independentes.
   const episodes = ref ? await fetchEpisodes(ref) : {};
+
+  if (ref && episode && episode > 0 && !episodes[episode]) {
+    const avulso = await findEpisodeAcrossSeasons(ref, episode);
+    if (avulso) episodes[episode] = avulso;
+  }
 
   return { ...result, episodes };
 };

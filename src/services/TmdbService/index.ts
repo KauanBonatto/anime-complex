@@ -114,11 +114,24 @@ class TmdbServiceClass {
   ): Promise<TmdbEpisode | null> {
     if (!episodeNumber) return null;
 
+    // A consulta sem alvo cobre a maioria e é a mesma que a ficha usa, então
+    // vale tentar o cache compartilhado antes de pedir qualquer coisa a mais.
     const localized = await localizedCache
       .resolve(anime.id, () => this.fetchPtBr(anime))
       .catch(() => EMPTY);
 
-    return localized.episodes?.[episodeNumber] ?? null;
+    const conhecido = localized.episodes?.[episodeNumber];
+    if (conhecido) return conhecido;
+
+    // Séries longas que o TMDB divide em temporadas: o episódio existe, mas
+    // fora da temporada apontada pelo mapeamento. Aí sim vale a busca dirigida.
+    const dirigido = await localizedCache
+      .resolve(`${anime.id}:ep${episodeNumber}`, () =>
+        this.fetchPtBr(anime, episodeNumber)
+      )
+      .catch(() => EMPTY);
+
+    return dirigido.episodes?.[episodeNumber] ?? null;
   }
 
   /**
@@ -126,13 +139,17 @@ class TmdbServiceClass {
    * tem" é resposta válida e vale cache. Erros de rede são propagados para não
    * virarem cache.
    */
-  private async fetchPtBr(anime: AnimeProps): Promise<LocalizedAnime> {
+  private async fetchPtBr(
+    anime: AnimeProps,
+    episode?: number
+  ): Promise<LocalizedAnime> {
     const { data } = await synopsisApi.get<SynopsisResponse>(`/${anime.id}`, {
       params: {
         title: anime.title,
         titleEnglish: anime.titleEnglish ?? undefined,
         year: anime.releaseDate ?? undefined,
         format: anime.format ?? undefined,
+        episode,
       },
     });
 

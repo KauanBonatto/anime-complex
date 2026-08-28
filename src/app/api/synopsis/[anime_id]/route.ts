@@ -54,11 +54,17 @@ export async function GET(
   );
   const year = Number(search.get("year")) || null;
   const format = search.get("format");
+  const episode = Number(search.get("episode")) || null;
   const uniqueTitles = Array.from(new Set(titles));
 
+  // A resposta muda quando um episódio de outra temporada é anexado, então ela
+  // não pode dividir a entrada com a consulta sem alvo.
+  const cacheKey = episode ? `${anilistId}:ep${episode}` : String(anilistId);
+
   const synopsis = await synopsisCache.resolve(
-    String(anilistId),
-    () => getPtBrSynopsis({ anilistId, titles: uniqueTitles, year, format }),
+    cacheKey,
+    () =>
+      getPtBrSynopsis({ anilistId, titles: uniqueTitles, year, format, episode }),
     // Resposta vazia pode ser o TMDB fora do ar; tentamos de novo na próxima.
     {
       shouldStore: (result) =>
