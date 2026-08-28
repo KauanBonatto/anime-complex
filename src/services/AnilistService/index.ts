@@ -37,7 +37,7 @@ const LIST_TTL = ONE_HOUR;
 
 /** Listas paginadas: populares, recentes e buscas. */
 const listCache = createCache<ResponseApiProps>({
-  namespace: "anilist:list:v2",
+  namespace: "anilist:list:v3",
   ttl: LIST_TTL,
   persist: true,
 });
@@ -46,7 +46,7 @@ const listCache = createCache<ResponseApiProps>({
 const detailsCache = createCache<AnimeDetailsProps | null>({
   // O sufixo muda junto com o formato da ficha: fichas guardadas antes de um
   // campo novo existir seguiriam válidas por uma hora, sem ele.
-  namespace: "anilist:details:v4",
+  namespace: "anilist:details:v5",
   ttl: LIST_TTL,
   persist: true,
 });
@@ -371,6 +371,8 @@ class AnilistServiceClass {
       malId: media.idMal,
       title: media.title?.romaji ?? media.title?.english ?? "Sem título",
       titleEnglish: media.title?.english ?? null,
+      titleNative: media.title?.native ?? null,
+      startDate: this.toStartDate(media),
       image:
         media.coverImage?.extraLarge ??
         media.coverImage?.large ??
@@ -531,6 +533,20 @@ class AnilistServiceClass {
     const next = media.nextAiringEpisode;
     if (!next?.airingAt) return null;
     return { number: next.episode, airingAt: next.airingAt };
+  }
+
+  /**
+   * Data de estreia completa, quando o AniList tem o dia. É a âncora que
+   * identifica a obra no TMDB quando ela não está na tabela de equivalência:
+   * um episódio que foi ao ar exatamente nesse dia dificilmente é de outra
+   * série. Uma data pela metade não serve para isso, então vira nulo.
+   */
+  private toStartDate(media: AnilistMedia): string | null {
+    const { year, month, day } = media.startDate ?? {};
+    if (!year || !month || !day) return null;
+
+    const doisDigitos = (valor: number) => String(valor).padStart(2, "0");
+    return `${year}-${doisDigitos(month)}-${doisDigitos(day)}`;
   }
 
   private toReleaseDate(media: AnilistMedia): string | null {

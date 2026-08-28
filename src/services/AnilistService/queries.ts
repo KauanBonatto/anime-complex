@@ -4,6 +4,7 @@ const ANIME_FIELDS = `
   title {
     romaji
     english
+    native
   }
   coverImage {
     large

@@ -10,6 +10,7 @@ export interface AnilistMedia {
   title: {
     romaji: string | null;
     english: string | null;
+    native?: string | null;
   };
   coverImage: {
     large: string | null;

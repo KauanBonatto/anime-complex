@@ -25,7 +25,7 @@ const localizedCache = createCache<LocalizedAnime>({
   // O sufixo muda junto com o formato, e também quando uma correção precisa
   // valer para quem já tem o cache antigo no navegador — foi o caso da v4,
   // que descarta as entradas vazias gravadas pela versão sem a guarda abaixo.
-  namespace: "tmdb:localized:v4",
+  namespace: "tmdb:localized:v5",
   ttl: ONE_DAY,
   persist: true,
 });
@@ -189,8 +189,10 @@ class TmdbServiceClass {
       params: {
         title: anime.title,
         titleEnglish: anime.titleEnglish ?? undefined,
+        titleNative: anime.titleNative ?? undefined,
         year: anime.releaseDate ?? undefined,
         format: anime.format ?? undefined,
+        premiere: anime.startDate ?? undefined,
         episode,
       },
     });

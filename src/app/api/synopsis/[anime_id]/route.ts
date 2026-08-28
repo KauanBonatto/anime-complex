@@ -15,7 +15,7 @@ const SYNOPSIS_TTL = ONE_DAY;
 const synopsisCache = createCache<SynopsisResult>({
   // O sufixo muda junto com o formato da resposta: respostas guardadas antes de
   // os episódios trazerem imagem seguiriam válidas por um dia, sem ele.
-  namespace: "synopsis:v2",
+  namespace: "synopsis:v3",
   ttl: SYNOPSIS_TTL,
   maxEntries: 500,
 });
@@ -49,12 +49,17 @@ export async function GET(
   }
 
   const search = new URL(request.url).searchParams;
-  const titles = [search.get("titleEnglish"), search.get("title")].filter(
-    (title): title is string => !!title?.trim()
-  );
+  // O nativo vem primeiro: é por ele que o TMDB indexa a obra, e é o que mais
+  // acerta nas séries que ainda não têm título em inglês cadastrado.
+  const titles = [
+    search.get("titleNative"),
+    search.get("titleEnglish"),
+    search.get("title"),
+  ].filter((title): title is string => !!title?.trim());
   const year = Number(search.get("year")) || null;
   const format = search.get("format");
   const episode = Number(search.get("episode")) || null;
+  const premiere = search.get("premiere");
   const uniqueTitles = Array.from(new Set(titles));
 
   // A resposta muda quando um episódio de outra temporada é anexado, então ela
@@ -64,7 +69,14 @@ export async function GET(
   const synopsis = await synopsisCache.resolve(
     cacheKey,
     () =>
-      getPtBrSynopsis({ anilistId, titles: uniqueTitles, year, format, episode }),
+      getPtBrSynopsis({
+        anilistId,
+        titles: uniqueTitles,
+        year,
+        format,
+        premiere,
+        episode,
+      }),
     // Resposta vazia pode ser o TMDB fora do ar; tentamos de novo na próxima.
     {
       shouldStore: (result) =>

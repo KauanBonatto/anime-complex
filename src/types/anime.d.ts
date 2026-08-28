@@ -11,6 +11,10 @@ interface AnimeProps {
   airedAt?: number | null;
   title: string;
   titleEnglish?: string | null;
+  /** Título original em japonês. É por ele que o TMDB indexa a obra. */
+  titleNative?: string | null;
+  /** Estreia no formato AAAA-MM-DD, quando o AniList sabe o dia. */
+  startDate?: string | null;
   image: string;
   /** Arte deitada. Só vem nas listas que pedem por ela. */
   bannerImage?: string | null;

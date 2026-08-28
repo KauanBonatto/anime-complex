@@ -88,8 +88,17 @@ interface TmdbTitle {
   title?: string | null;
 }
 
+interface TmdbMovie extends TmdbTitle {
+  /** Arte deitada da produção; é ela que ilustra o filme na lista. */
+  backdrop_path?: string | null;
+  release_date?: string | null;
+  /** Minutos. */
+  runtime?: number | null;
+}
+
 interface TmdbSearchResult extends TmdbTitle {
   id: number;
+  original_name?: string | null;
   first_air_date?: string | null;
   release_date?: string | null;
 }
@@ -272,9 +281,38 @@ const toEpisode = (raw: TmdbRawEpisode, number: number): TmdbEpisode | null => {
   return { number, title, thumbnail, airedAt, duration, overview };
 };
 
+/**
+ * Um filme não tem episódios, mas ocupa o mesmo lugar nas telas: ele aparece na
+ * grade de exibição do AniList com "episódio 1" e vira um card como os outros.
+ * Sem isso o card ficava no degradê, embora o TMDB tenha a arte da produção.
+ *
+ * A imagem é a arte deitada que o TMDB já elege como principal, e vem na mesma
+ * resposta que a sinopse — nenhuma requisição a mais. O título fica nulo de
+ * propósito: repetir o nome do filme embaixo do nome do filme não informa nada.
+ */
+const fetchMovieAsEpisode = async (
+  ref: TmdbRef
+): Promise<Record<number, TmdbEpisode>> => {
+  const movie = await tmdbRequest<TmdbMovie>(`/movie/${ref.id}`);
+  if (!movie) return {};
+
+  const backdrop = text(movie.backdrop_path);
+  const thumbnail = backdrop ? `${STILL_BASE_URL}${backdrop}` : null;
+  const airedAt = toEpoch(movie.release_date);
+  const overview = text(movie.overview);
+  const duration = movie.runtime && movie.runtime > 0 ? movie.runtime : null;
+
+  if (!thumbnail && !airedAt && !overview) return {};
+
+  return {
+    1: { number: 1, title: null, thumbnail, airedAt, duration, overview },
+  };
+};
+
 const fetchEpisodes = async (
   ref: TmdbRef
 ): Promise<Record<number, TmdbEpisode>> => {
+  if (ref.kind === "movie") return fetchMovieAsEpisode(ref);
   if (ref.kind !== "tv") return {};
 
   const season = await tmdbRequest<TmdbSeason>(
@@ -297,7 +335,13 @@ const fetchEpisodes = async (
 };
 
 interface TmdbShow {
-  seasons?: { season_number?: number; episode_count?: number }[];
+  original_name?: string | null;
+  name?: string | null;
+  seasons?: {
+    season_number?: number;
+    episode_count?: number;
+    air_date?: string | null;
+  }[];
 }
 
 /**
@@ -373,6 +417,108 @@ const fromRef = async (ref: TmdbRef): Promise<SynopsisResult> => {
   }
 
   return toResult(await tmdbRequest<TmdbTitle>(`/tv/${ref.id}`));
+};
+
+/**
+ * Candidatos examinados antes de desistir, somando todos os títulos tentados —
+ * e não por título. Sem o teto global, três termos com quatro candidatos cada
+ * chegariam a quase cinco dezenas de requisições numa obra que ninguém vai
+ * conseguir identificar mesmo.
+ */
+const MAX_CANDIDATOS = 4;
+
+/** Temporadas consultadas por candidato: cada uma custa uma requisição. */
+const MAX_TEMPORADAS = 3;
+
+const normalizar = (valor?: string | null) =>
+  (valor ?? "").toLowerCase().replace(/[\s:!?.,'"\-–—~]/g, "");
+
+/**
+ * O nome no TMDB precisa ter parentesco com algum título do AniList. Não exige
+ * igualdade porque as sequências divergem de propósito — o AniList escreve
+ * "正反対な君と僕 第2期" e o TMDB guarda a série inteira como "正反対な君と僕" —,
+ * então basta que um seja começo do outro.
+ */
+const nomeCombina = (show: TmdbSearchResult, titles: string[]) =>
+  [show.original_name, show.name].some((nome) => {
+    const alvo = normalizar(nome);
+    if (!alvo) return false;
+    return titles.some((titulo) => {
+      const base = normalizar(titulo);
+      return !!base && (base.startsWith(alvo) || alvo.startsWith(base));
+    });
+  });
+
+/** Temporadas mais próximas da estreia primeiro: é onde a âncora deve estar. */
+const temporadasProvaveis = (show: TmdbShow | null, premiere: string) => {
+  const distancia = (data?: string | null) =>
+    data ? Math.abs(Date.parse(data) - Date.parse(premiere)) : Number.MAX_SAFE_INTEGER;
+
+  return (show?.seasons ?? [])
+    .filter((season) => (season.season_number ?? 0) > 0)
+    .sort((a, b) => distancia(a.air_date) - distancia(b.air_date))
+    .slice(0, MAX_TEMPORADAS);
+};
+
+/**
+ * Identifica a obra no TMDB pela data de estreia, para quem não está na tabela
+ * de equivalência.
+ *
+ * A busca por título sozinha nunca alimentou os episódios, e com razão: casar a
+ * série errada renomearia a temporada inteira. O que muda aqui é que o palpite
+ * passa a ser conferido — procuramos o episódio que foi ao ar exatamente no dia
+ * em que o AniList diz que a obra estreou, e é ele que define a temporada e o
+ * deslocamento. Duas séries diferentes até podem ter títulos parecidos, mas
+ * dificilmente um episódio no mesmo dia com o nome parecido.
+ *
+ * O método foi conferido contra a própria tabela de equivalência: em doze obras
+ * já mapeadas devolveu o mesmo id, temporada e deslocamento em onze e se calou
+ * na restante, sem nenhuma divergência.
+ */
+const resolveByPremiere = async (
+  titles: string[],
+  premiere: string | null
+): Promise<TmdbRef | null> => {
+  if (!premiere || !titles.length) return null;
+
+  const examinados = new Set<number>();
+
+  for (const termo of titles) {
+    const busca = await tmdbRequest<{ results?: TmdbSearchResult[] }>(
+      "/search/tv",
+      { query: termo }
+    );
+
+    for (const candidato of busca?.results ?? []) {
+      if (examinados.size >= MAX_CANDIDATOS) return null;
+      if (examinados.has(candidato.id)) continue;
+      if (!nomeCombina(candidato, titles)) continue;
+      examinados.add(candidato.id);
+
+      const show = await tmdbRequest<TmdbShow>(`/tv/${candidato.id}`);
+
+      for (const season of temporadasProvaveis(show, premiere)) {
+        const dados = await tmdbRequest<TmdbSeason>(
+          `/tv/${candidato.id}/season/${season.season_number}`
+        );
+        const ancora = (dados?.episodes ?? []).find(
+          (episode) => text(episode.air_date) === premiere
+        );
+        if (!ancora?.episode_number) continue;
+
+        return {
+          kind: "tv",
+          id: candidato.id,
+          season: season.season_number ?? 1,
+          // A âncora é o episódio 1 daqui; o que vem antes é da temporada
+          // anterior, que o AniList trata como outra obra.
+          episodeOffset: ancora.episode_number - 1,
+        };
+      }
+    }
+  }
+
+  return null;
 };
 
 interface SearchAttempt {
@@ -462,6 +608,8 @@ export interface SynopsisQuery {
   titles: string[];
   year: number | null;
   format: string | null;
+  /** Estreia em AAAA-MM-DD; a âncora de quem não está no mapeamento. */
+  premiere?: string | null;
   /**
    * Episódio que o chamador precisa. Quando ele não está na temporada
    * apontada pelo mapeamento, as outras temporadas da série são consultadas
@@ -480,6 +628,7 @@ export const getPtBrSynopsis = async ({
   titles,
   year,
   format,
+  premiere,
   episode,
 }: SynopsisQuery): Promise<SynopsisResult> => {
   if (!process.env.TMDB_API_KEY) return EMPTY_RESULT;
@@ -487,8 +636,12 @@ export const getPtBrSynopsis = async ({
   const mapping = await mappingWithinBudget();
   const mappedRef = mapping?.get(anilistId) ?? null;
 
-  let result = mappedRef ? await fromRef(mappedRef) : EMPTY_RESULT;
-  let ref = mappedRef;
+  // Fora da tabela de equivalência, a estreia identifica a obra. É mais caro
+  // que uma consulta por id, por isso só entra quando o mapeamento não tem.
+  const verifiedRef = mappedRef ?? (await resolveByPremiere(titles, premiere ?? null));
+
+  let result = verifiedRef ? await fromRef(verifiedRef) : EMPTY_RESULT;
+  let ref = verifiedRef;
 
   if (!result.description) {
     const searched = await fromSearch(titles, year, format);
