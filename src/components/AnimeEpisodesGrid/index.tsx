@@ -1,8 +1,9 @@
 "use client";
 
 import EpisodeCard from "@/components/EpisodeCard";
+import { useEpisodeCatalog } from "@/hooks/useEpisodeCatalog";
 import { Box, Button, TextField, Typography, useTheme } from "@mui/material";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 /**
  * Os cards agora carregam imagem, então a página é bem menor que a antiga de
@@ -41,17 +42,30 @@ const AnimeEpisodesGrid = ({
 
   const totalPages = Math.ceil(anime.availableEpisodes / EPISODES_PER_PAGE);
   const firstEpisode = page * EPISODES_PER_PAGE + 1;
-  const episodes = Array.from(
-    {
-      length: Math.min(
-        EPISODES_PER_PAGE,
-        anime.availableEpisodes - page * EPISODES_PER_PAGE
+  const numbers = useMemo(
+    () =>
+      Array.from(
+        {
+          length: Math.min(
+            EPISODES_PER_PAGE,
+            anime.availableEpisodes - page * EPISODES_PER_PAGE
+          ),
+        },
+        (_, index) => firstEpisode + index
       ),
-    },
-    (_, index) => {
-      const number = firstEpisode + index;
-      return anime.episodes?.[number] ?? placeholderEpisode(number, anime.duration);
-    }
+    [anime.availableEpisodes, firstEpisode, page]
+  );
+
+  // A primeira e a última da página cobrem também as que caem na virada de uma
+  // temporada do TMDB para a outra.
+  const anchors = useMemo(
+    () => [numbers[0], numbers[numbers.length - 1]].filter(Boolean),
+    [numbers]
+  );
+  const catalog = useEpisodeCatalog(anime, anchors);
+
+  const episodes = numbers.map(
+    (number) => catalog[number] ?? placeholderEpisode(number, anime.duration)
   );
 
   /** Leva direto à página que contém o episódio pedido. */

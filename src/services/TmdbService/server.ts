@@ -301,7 +301,8 @@ interface TmdbShow {
 }
 
 /**
- * Procura um episódio nas outras temporadas da série.
+ * Traz a temporada que contém um episódio, quando ele não está na apontada
+ * pelo mapeamento.
  *
  * A tabela de equivalência aponta uma temporada só, o que basta para os animes
  * que o AniList fatia em obras por temporada. Já as séries que correm sem
@@ -310,14 +311,15 @@ interface TmdbShow {
  * 1175 existe, mas não na temporada apontada.
  *
  * O intervalo cumulativo de episódios diz qual temporada deveria conter o
- * número pedido, e só ela é consultada. Dentro dela as duas leituras são
- * aceitas, porque o TMDB numera umas séries pelo absoluto e outras reiniciando
- * em 1 a cada temporada.
+ * número pedido, e só ela é consultada. Devolve a temporada inteira, e não só o
+ * episódio perguntado, porque quem abre a lista de uma série longa vai ver duas
+ * dezenas de episódios vizinhos na mesma tela — buscar um por um seria uma
+ * requisição por card.
  */
-const findEpisodeAcrossSeasons = async (
+const fetchSeasonAround = async (
   ref: TmdbRef,
   target: number
-): Promise<TmdbEpisode | null> => {
+): Promise<Record<number, TmdbEpisode>> => {
   const show = await tmdbRequest<TmdbShow>(`/tv/${ref.id}`);
   const seasons = (show?.seasons ?? []).filter(
     (season) => (season.season_number ?? 0) > 0
@@ -329,21 +331,32 @@ const findEpisodeAcrossSeasons = async (
     previous += season.episode_count ?? 0;
     if (target < first || target > previous) continue;
     // A temporada apontada pelo mapeamento já foi consultada e não tinha.
-    if (season.season_number === (ref.season ?? 1)) return null;
+    if (season.season_number === (ref.season ?? 1)) return {};
 
     const data = await tmdbRequest<TmdbSeason>(
       `/tv/${ref.id}/season/${season.season_number}`
     );
-    const raw =
-      data?.episodes?.find((item) => item.episode_number === target) ??
-      data?.episodes?.find(
-        (item) => item.episode_number === target - first + 1
-      );
+    const raws = data?.episodes ?? [];
 
-    return raw ? toEpisode(raw, target) : null;
+    // O TMDB numera umas séries pelo absoluto dentro da temporada (a 23 de One
+    // Piece vai de 1156 a 1181) e outras reiniciando em 1. Descobrimos qual é
+    // pelo episódio procurado e aplicamos a mesma leitura ao resto.
+    const absoluta = raws.some((item) => item.episode_number === target);
+    const deslocamento = absoluta ? 0 : first - 1;
+
+    const episodes: Record<number, TmdbEpisode> = {};
+    for (const raw of raws) {
+      if (!raw.episode_number) continue;
+
+      const number = raw.episode_number + deslocamento;
+      const episode = toEpisode(raw, number);
+      if (episode) episodes[number] = episode;
+    }
+
+    return episodes;
   }
 
-  return null;
+  return {};
 };
 
 const fromRef = async (ref: TmdbRef): Promise<SynopsisResult> => {
@@ -490,8 +503,7 @@ export const getPtBrSynopsis = async ({
   const episodes = ref ? await fetchEpisodes(ref) : {};
 
   if (ref && episode && episode > 0 && !episodes[episode]) {
-    const avulso = await findEpisodeAcrossSeasons(ref, episode);
-    if (avulso) episodes[episode] = avulso;
+    Object.assign(episodes, await fetchSeasonAround(ref, episode));
   }
 
   return { ...result, episodes };

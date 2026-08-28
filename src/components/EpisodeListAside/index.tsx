@@ -1,6 +1,7 @@
 "use client";
 
 import EpisodeCard from "@/components/EpisodeCard";
+import { useEpisodeCatalog } from "@/hooks/useEpisodeCatalog";
 import { NAVBAR_HEIGHT } from "@/components/PageShell/height";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
@@ -26,6 +27,12 @@ interface EpisodeListAsideProps {
   /** Vazio enquanto a franquia carrega, ou quando a obra é avulsa. */
   seasons: FranchiseSeasonProps[];
   currentEpisode: number;
+  /**
+   * Falso enquanto a tradução do TMDB não chegou. A tela do episódio mostra o
+   * aside antes disso, para o player não esperar, e sem esta ressalva o
+   * catálogo pediria a vizinhança de um episódio que está para chegar sozinho.
+   */
+  localized?: boolean;
 }
 
 /**
@@ -41,8 +48,10 @@ const EpisodeListAside = ({
   anime,
   seasons,
   currentEpisode,
+  localized = true,
 }: EpisodeListAsideProps) => {
   const hasSeasons = seasons.length > 1;
+  const catalog = useEpisodeCatalog(anime, localized ? [currentEpisode] : []);
 
   return (
     <Box
@@ -74,7 +83,11 @@ const EpisodeListAside = ({
               ({anime.availableEpisodes})
             </Typography>
           </Typography>
-          <EpisodeList anime={anime} currentEpisode={currentEpisode} />
+          <EpisodeList
+            anime={anime}
+            catalog={catalog}
+            currentEpisode={currentEpisode}
+          />
         </>
       ) : (
         seasons.map((season) =>
@@ -100,7 +113,11 @@ const EpisodeListAside = ({
                 </Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ p: 0 }}>
-                <EpisodeList anime={anime} currentEpisode={currentEpisode} />
+                <EpisodeList
+                  anime={anime}
+                  catalog={catalog}
+                  currentEpisode={currentEpisode}
+                />
               </AccordionDetails>
             </Accordion>
           ) : (
@@ -137,9 +154,11 @@ const EpisodeListAside = ({
 /** Episódios da temporada aberta, já rolados até o que está tocando. */
 const EpisodeList = ({
   anime,
+  catalog,
   currentEpisode,
 }: {
   anime: AnimeDetailsProps;
+  catalog: Record<number, EpisodeInfoProps>;
   currentEpisode: number;
 }) => {
   const currentRef = useRef<HTMLDivElement | null>(null);
@@ -174,7 +193,7 @@ const EpisodeList = ({
               animeId={anime.id}
               isCurrent={isCurrent}
               episode={
-                anime.episodes?.[number] ?? {
+                catalog[number] ?? {
                   number,
                   title: null,
                   thumbnail: null,

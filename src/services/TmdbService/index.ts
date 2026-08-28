@@ -144,19 +144,36 @@ class TmdbServiceClass {
     const conhecido = localized.episodes?.[episodeNumber];
     if (conhecido) return conhecido;
 
-    // Séries longas que o TMDB divide em temporadas: o episódio existe, mas
-    // fora da temporada apontada pelo mapeamento. Aí sim vale a busca dirigida.
+    const vizinhanca = await this.getEpisodesAround(anime, episodeNumber);
+    return vizinhanca[episodeNumber] ?? null;
+  }
+
+  /**
+   * A temporada inteira em volta de um episódio que a consulta comum não
+   * conhece — o caso das séries longas, que o AniList numera de forma contínua
+   * e o TMDB divide em temporadas.
+   *
+   * Devolve a vizinhança, e não só o episódio pedido, porque quem abre a lista
+   * de episódios vê duas dezenas de vizinhos na mesma tela: uma requisição
+   * resolve a página toda, em vez de uma por card.
+   */
+  async getEpisodesAround(
+    anime: AnimeProps,
+    episodeNumber: number
+  ): Promise<Record<number, TmdbEpisode>> {
+    if (!episodeNumber) return {};
+
     const dirigido = await localizedCache
       .resolve(
         `${anime.id}:ep${episodeNumber}`,
         () => this.fetchPtBr(anime, episodeNumber),
-        // Aqui só interessa o episódio pedido: guardar uma resposta que não o
-        // traz congelaria a falha que a busca dirigida existe para desfazer.
+        // Aqui interessa o episódio pedido: guardar uma resposta que não o traz
+        // congelaria a falha que a busca dirigida existe para desfazer.
         { shouldStore: (dados) => !!dados.episodes?.[episodeNumber] }
       )
       .catch(() => EMPTY);
 
-    return dirigido.episodes?.[episodeNumber] ?? null;
+    return dirigido.episodes ?? {};
   }
 
   /**

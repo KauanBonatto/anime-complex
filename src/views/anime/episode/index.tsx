@@ -52,6 +52,7 @@ const AnimeEpisodeView = ({
   const [animeDetails, setAnimeDetails] = useState<AnimeDetailsProps | null>(
     null,
   );
+  const [localized, setLocalized] = useState(false);
   const [providers, setProviders] = useState<EpisodeProviderProps[]>([]);
   const [selectedProvider, setSelectedProvider] =
     useState<EpisodeProviderProps | null>(null);
@@ -60,6 +61,7 @@ const AnimeEpisodeView = ({
 
   const getEpisodeData = useCallback(async () => {
     setLoading(true);
+    setLocalized(false);
     setProviders([]);
     setSelectedProvider(null);
 
@@ -74,11 +76,12 @@ const AnimeEpisodeView = ({
     // pt-BR, com imagem e sinopse. Os players não esperam por essa tradução —
     // são buscados logo abaixo — e ela só é aplicada se a página ainda estiver
     // no mesmo anime, para uma resposta atrasada não sobrescrever outra ficha.
-    TmdbService.localize(animeDetailsData).then((localized) =>
+    TmdbService.localize(animeDetailsData).then((traduzido) => {
       setAnimeDetails((current) =>
-        current?.id === localized.id ? localized : current,
-      ),
-    );
+        current?.id === traduzido.id ? traduzido : current,
+      );
+      setLocalized(true);
+    });
 
     const episodeProviders = sortProviders(
       await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),
@@ -191,6 +194,7 @@ const AnimeEpisodeView = ({
               anime={animeDetails}
               seasons={seasons}
               currentEpisode={episodeNumber}
+              localized={localized}
             />
           ) : (
             <Skeleton variant="rounded" sx={{ width: "100%", height: 420 }} />
