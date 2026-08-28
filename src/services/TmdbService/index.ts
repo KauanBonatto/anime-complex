@@ -22,9 +22,10 @@ interface LocalizedAnime {
  * esse cache é o que evita gastá-las reabrindo as mesmas páginas.
  */
 const localizedCache = createCache<LocalizedAnime>({
-  // O sufixo muda junto com o formato: fichas guardadas antes de os episódios
-  // trazerem imagem e data seguiriam válidas por um dia, sem ele.
-  namespace: "tmdb:localized:v3",
+  // O sufixo muda junto com o formato, e também quando uma correção precisa
+  // valer para quem já tem o cache antigo no navegador — foi o caso da v4,
+  // que descarta as entradas vazias gravadas pela versão sem a guarda abaixo.
+  namespace: "tmdb:localized:v4",
   ttl: ONE_DAY,
   persist: true,
 });
@@ -37,6 +38,22 @@ interface SynopsisResponse {
 }
 
 const EMPTY: LocalizedAnime = { description: null, episodes: {} };
+
+/**
+ * Uma resposta sem nada não merece cache.
+ *
+ * Ela tanto pode significar "o TMDB não conhece esta obra" quanto um tropeço
+ * passageiro: tempo esgotado, tabela de equivalência ainda não carregada num
+ * processo novo do servidor, uma visita no meio de um deploy. Guardar isso por
+ * um dia deixava a obra sem imagem de episódio e com a sinopse em inglês
+ * naquele navegador, sem que recarregar a página resolvesse — o valor vinha do
+ * localStorage antes de qualquer requisição.
+ *
+ * É a mesma guarda que o handler /api/synopsis e os caches do AniList já usam;
+ * este era o único sem ela.
+ */
+const temConteudo = (dados: LocalizedAnime) =>
+  !!dados.description || Object.keys(dados.episodes ?? {}).length > 0;
 
 class TmdbServiceClass {
   /**
@@ -51,7 +68,9 @@ class TmdbServiceClass {
     // Uma falha na busca não vira cache: o fetch abaixo propaga o erro e o
     // catch daqui mantém o texto em inglês só nesta visita.
     const localized = await localizedCache
-      .resolve(anime.id, () => this.fetchPtBr(anime))
+      .resolve(anime.id, () => this.fetchPtBr(anime), {
+        shouldStore: temConteudo,
+      })
       .catch(() => EMPTY);
 
     return {
@@ -117,7 +136,9 @@ class TmdbServiceClass {
     // A consulta sem alvo cobre a maioria e é a mesma que a ficha usa, então
     // vale tentar o cache compartilhado antes de pedir qualquer coisa a mais.
     const localized = await localizedCache
-      .resolve(anime.id, () => this.fetchPtBr(anime))
+      .resolve(anime.id, () => this.fetchPtBr(anime), {
+        shouldStore: temConteudo,
+      })
       .catch(() => EMPTY);
 
     const conhecido = localized.episodes?.[episodeNumber];
@@ -126,8 +147,12 @@ class TmdbServiceClass {
     // Séries longas que o TMDB divide em temporadas: o episódio existe, mas
     // fora da temporada apontada pelo mapeamento. Aí sim vale a busca dirigida.
     const dirigido = await localizedCache
-      .resolve(`${anime.id}:ep${episodeNumber}`, () =>
-        this.fetchPtBr(anime, episodeNumber)
+      .resolve(
+        `${anime.id}:ep${episodeNumber}`,
+        () => this.fetchPtBr(anime, episodeNumber),
+        // Aqui só interessa o episódio pedido: guardar uma resposta que não o
+        // traz congelaria a falha que a busca dirigida existe para desfazer.
+        { shouldStore: (dados) => !!dados.episodes?.[episodeNumber] }
       )
       .catch(() => EMPTY);
 
