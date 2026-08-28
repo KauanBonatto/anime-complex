@@ -100,16 +100,38 @@ class TmdbServiceClass {
   }
 
   /**
+   * Um episódio específico, a partir só do que uma lista já traz — sem exigir
+   * a ficha completa da obra.
+   *
+   * Existe para os cards de "Episódios Recentes": a grade de exibição do
+   * AniList não devolve `streamingEpisodes`, e mesmo em consulta direta ele não
+   * cobre episódios recém-exibidos, então a imagem do episódio só existe no
+   * TMDB. Compartilha o cache com a ficha, porque a chave é a mesma obra.
+   */
+  async getEpisode(
+    anime: AnimeProps,
+    episodeNumber: number
+  ): Promise<TmdbEpisode | null> {
+    if (!episodeNumber) return null;
+
+    const localized = await localizedCache
+      .resolve(anime.id, () => this.fetchPtBr(anime))
+      .catch(() => EMPTY);
+
+    return localized.episodes?.[episodeNumber] ?? null;
+  }
+
+  /**
    * Devolve campos nulos/vazios quando o TMDB não tem tradução — esse "não
    * tem" é resposta válida e vale cache. Erros de rede são propagados para não
    * virarem cache.
    */
-  private async fetchPtBr(anime: AnimeDetailsProps): Promise<LocalizedAnime> {
+  private async fetchPtBr(anime: AnimeProps): Promise<LocalizedAnime> {
     const { data } = await synopsisApi.get<SynopsisResponse>(`/${anime.id}`, {
       params: {
         title: anime.title,
         titleEnglish: anime.titleEnglish ?? undefined,
-        year: anime.seasonYear ?? anime.releaseDate ?? undefined,
+        year: anime.releaseDate ?? undefined,
         format: anime.format ?? undefined,
       },
     });

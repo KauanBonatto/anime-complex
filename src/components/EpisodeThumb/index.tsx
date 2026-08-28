@@ -1,5 +1,8 @@
+"use client";
+
 import { Box, Typography } from "@mui/material";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 /**
  * Hosts liberados no next.config e, portanto, elegíveis ao next/image. Os
@@ -34,69 +37,80 @@ const EpisodeThumb = ({
   fallbackLabel,
   sizes,
   compact = false,
-}: EpisodeThumbProps) => (
-  <Box
-    sx={{
-      position: "relative",
-      width: "100%",
-      aspectRatio: "16 / 9",
-      overflow: "hidden",
-      backgroundColor: "primary.main",
-      backgroundImage: (theme) =>
-        `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.dark} 100%)`,
-    }}
-  >
-    {src ? (
-      isOptimized(src) ? (
-        <Image
-          className="episode-thumb"
-          src={src}
-          alt={alt}
-          fill
-          sizes={sizes}
-          draggable={false}
-          style={{ objectFit: "cover", transition: ".3s" }}
-        />
+}: EpisodeThumbProps) => {
+  // Os endereços da Crunchyroll expiram e voltam 404; sem isto o card ficaria
+  // com o ícone de imagem quebrada no lugar do degradê.
+  const [falhou, setFalhou] = useState(false);
+  useEffect(() => setFalhou(false), [src]);
+
+  const imagem = falhou ? null : src;
+
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: "16 / 9",
+        overflow: "hidden",
+        backgroundColor: "primary.main",
+        backgroundImage: (theme) =>
+          `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.dark} 100%)`,
+      }}
+    >
+      {imagem ? (
+        isOptimized(imagem) ? (
+          <Image
+            className="episode-thumb"
+            src={imagem}
+            alt={alt}
+            fill
+            sizes={sizes}
+            draggable={false}
+            onError={() => setFalhou(true)}
+            style={{ objectFit: "cover", transition: ".3s" }}
+          />
+        ) : (
+          <Box
+            component="img"
+            className="episode-thumb"
+            src={imagem}
+            alt={alt}
+            loading="lazy"
+            draggable={false}
+            onError={() => setFalhou(true)}
+            sx={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transition: ".3s",
+            }}
+          />
+        )
       ) : (
         <Box
-          component="img"
-          className="episode-thumb"
-          src={src}
-          alt={alt}
-          loading="lazy"
-          draggable={false}
           sx={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transition: ".3s",
-          }}
-        />
-      )
-    ) : (
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Typography
-          fontWeight={700}
-          color="common.white"
-          sx={{
-            opacity: 0.55,
-            lineHeight: 1,
-            fontSize: compact ? "1rem" : { xs: "1.75rem", sm: "2.25rem" },
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {fallbackLabel}
-        </Typography>
-      </Box>
-    )}
-  </Box>
-);
+          <Typography
+            fontWeight={700}
+            color="common.white"
+            sx={{
+              opacity: 0.55,
+              lineHeight: 1,
+              fontSize: compact ? "1rem" : { xs: "1.75rem", sm: "2.25rem" },
+            }}
+          >
+            {fallbackLabel}
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  );
+};
 
 export default EpisodeThumb;

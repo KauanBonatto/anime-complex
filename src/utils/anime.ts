@@ -205,6 +205,21 @@ export const episodeDateLabel = (airedAt: number) =>
   });
 
 /**
+ * "12 de outubro de 2025" — quando o episódio foi ao ar, no fuso do usuário.
+ *
+ * Não usa o episodeDateLabel de propósito: lá a fonte é uma data de calendário
+ * do TMDB, sem horário, que precisa ser lida em UTC para não recuar um dia;
+ * aqui o valor é um instante real da grade de exibição do AniList, e o fuso de
+ * quem assiste é justamente o que interessa.
+ */
+export const airedDateLabel = (airedAt: number) =>
+  new Date(airedAt * 1000).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+/**
  * Quanto tempo faz, em texto curto: "há 3 h", "há 2 dias". Usado na lista de
  * episódios recentes, onde a data exata importa menos que a sensação de
  * novidade — por isso uma unidade só.
