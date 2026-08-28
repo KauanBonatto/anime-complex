@@ -1,28 +1,25 @@
 "use client";
 
-import AnimeEpisodesGrid from "@/components/AnimeEpisodesGrid";
 import CrunchyrollChip from "@/components/CrunchyrollChip";
+import EpisodeListAside from "@/components/EpisodeListAside";
 import EpisodePlayer from "@/components/EpisodePlayer";
-import Footer from "@/components/Footer";
-import Navbar from "@/components/Navbar";
+import PageShell from "@/components/PageShell";
+import { useFranchiseSeasons } from "@/hooks/useFranchiseSeasons";
 import AnilistService from "@/services/AnilistService";
 import SugoiService from "@/services/SugoiService";
 import TmdbService from "@/services/TmdbService";
-import { crunchyrollEpisodeLink } from "@/utils/anime";
+import { crunchyrollEpisodeLink, episodeDateLabel } from "@/utils/anime";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import {
   Box,
   Button,
-  Card,
   Grid,
-  LinearProgress,
   Skeleton,
   Stack,
   Typography,
 } from "@mui/material";
-import { notFound } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -59,6 +56,8 @@ const AnimeEpisodeView = ({
   const [selectedProvider, setSelectedProvider] =
     useState<EpisodeProviderProps | null>(null);
 
+  const seasons = useFranchiseSeasons(animeId);
+
   const getEpisodeData = useCallback(async () => {
     setLoading(true);
     setProviders([]);
@@ -71,10 +70,10 @@ const AnimeEpisodeView = ({
       return;
     }
     setAnimeDetails(animeDetailsData);
-    // O nome do episódio vem em inglês do AniList; o TMDB tem a versão em
-    // pt-BR. Os players não esperam por essa tradução — são buscados logo
-    // abaixo — e ela só é aplicada se a página ainda estiver no mesmo anime,
-    // para uma resposta atrasada não sobrescrever outra ficha.
+    // Os dados de episódio vêm em inglês do AniList; o TMDB tem a versão em
+    // pt-BR, com imagem e sinopse. Os players não esperam por essa tradução —
+    // são buscados logo abaixo — e ela só é aplicada se a página ainda estiver
+    // no mesmo anime, para uma resposta atrasada não sobrescrever outra ficha.
     TmdbService.localize(animeDetailsData).then((localized) =>
       setAnimeDetails((current) =>
         current?.id === localized.id ? localized : current,
@@ -109,45 +108,32 @@ const AnimeEpisodeView = ({
     episodeNumber,
   );
 
-  const episodeTitle = animeDetails?.episodeTitles?.[episodeNumber];
+  const episode = animeDetails?.episodes?.[episodeNumber];
 
   return (
-    <Box width="100%">
-      {loading && (
-        <LinearProgress
-          sx={{ width: "100%", position: "fixed" }}
-          color="primary"
-        />
-      )}
-      <Navbar />
-      <Card
-        sx={{
-          minHeight: "calc(100vh - 108px)",
-          borderRadius: 0,
-          p: 5,
-        }}
-      >
-        <Grid container>
-          <Grid item xs={12} mt={1} mb={4}>
+    <PageShell loading={loading}>
+      <Grid container spacing={4}>
+        <Grid item xs={12} lg={8}>
+          <Box mb={3}>
             <Typography variant="h4" fontWeight={500}>
               {animeDetails?.title ?? <Skeleton sx={{ maxWidth: 380 }} />}
             </Typography>
             <Typography variant="h6" fontWeight={400} color="text.disabled">
               Episódio {episodeNumber}
-              {episodeTitle && ` - ${episodeTitle}`}
+              {episode?.title && ` - ${episode.title}`}
             </Typography>
-          </Grid>
+            {!!episode?.airedAt && (
+              <Typography variant="caption" color="text.disabled">
+                Exibido em {episodeDateLabel(episode.airedAt)}
+              </Typography>
+            )}
+          </Box>
 
-          <Grid item xs={12} mb={4}>
+          <Box mb={4}>
             {loading && (
               <Skeleton
                 variant="rounded"
-                sx={{
-                  maxWidth: "100%",
-                  width: 900,
-                  height: 506,
-                  margin: "auto",
-                }}
+                sx={{ width: "100%", height: "auto", aspectRatio: "16 / 9" }}
               />
             )}
 
@@ -161,16 +147,16 @@ const AnimeEpisodeView = ({
             )}
 
             {!loading && !providers.length && (
-              <Stack alignItems="center" gap={2}>
+              <Stack alignItems="center" gap={2} py={4}>
                 <Typography>
                   Nenhum player encontrado para este episódio.
                 </Typography>
                 {crunchyrollLink && <CrunchyrollChip link={crunchyrollLink} />}
               </Stack>
             )}
-          </Grid>
+          </Box>
 
-          <Grid item xs={12} display="flex" gap={2} mb={5}>
+          <Box display="flex" flexWrap="wrap" gap={2} mb={3}>
             <Button
               variant="outlined"
               startIcon={<ArrowBackIosNewIcon />}
@@ -187,20 +173,31 @@ const AnimeEpisodeView = ({
             >
               Próximo episódio
             </Button>
-          </Grid>
+          </Box>
 
-          {animeDetails && (
-            <Grid item xs={12} mb={5}>
-              <AnimeEpisodesGrid
-                anime={animeDetails}
-                currentEpisode={episodeNumber}
-              />
-            </Grid>
+          {!!episode?.overview && (
+            <Typography
+              variant="body2"
+              sx={{ whiteSpace: "pre-line", maxWidth: 900 }}
+            >
+              {episode.overview}
+            </Typography>
           )}
         </Grid>
-      </Card>
-      <Footer />
-    </Box>
+
+        <Grid item xs={12} lg={4}>
+          {animeDetails ? (
+            <EpisodeListAside
+              anime={animeDetails}
+              seasons={seasons}
+              currentEpisode={episodeNumber}
+            />
+          ) : (
+            <Skeleton variant="rounded" sx={{ width: "100%", height: 420 }} />
+          )}
+        </Grid>
+      </Grid>
+    </PageShell>
   );
 };
 

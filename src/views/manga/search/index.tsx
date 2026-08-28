@@ -1,23 +1,24 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
-import Footer from "@/components/Footer";
-import Navbar from "@/components/Navbar";
+import FilterBar from "@/components/FilterBar";
+import PageShell from "@/components/PageShell";
 import MangaService from "@/services/MangaService";
-import {
-  Box,
-  Card,
-  Grid,
-  LinearProgress,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, TextField, Typography } from "@mui/material";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useDebounce } from "use-debounce";
 
+const MIN_SEARCH_LENGTH = 3;
+
 const MangaSearchView = () => {
+  const searchParams = useSearchParams();
+  // A navbar manda o termo por query; daqui em diante quem manda é o campo.
+  const initialSearch = searchParams?.get("q")?.trim() ?? "";
+
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState<string>("");
+  const [filters, setFilters] = useState<string[]>([]);
+  const [search, setSearch] = useState<string>(initialSearch);
   const [debouncedSearch] = useDebounce(search, 500);
   const [searchedList, setSearchedList] = useState<ResponseApiProps | null>(
     null
@@ -28,80 +29,56 @@ const MangaSearchView = () => {
       setLoading(true);
       const searchedListData = await MangaService.getMangaBySearch(
         debouncedSearch,
-        pageNumber
+        pageNumber,
+        filters
       );
       setSearchedList(searchedListData);
       setLoading(false);
     },
-    [debouncedSearch]
+    [debouncedSearch, filters]
   );
 
-  const handleSearch = (search: string) => {
-    setSearch(search.trim());
-  };
+  const filtersToken = `${debouncedSearch}:${filters.join(",")}`;
+  const hasSearch = debouncedSearch.length >= MIN_SEARCH_LENGTH;
 
   return (
-    <Box width="100%">
-      {loading && (
-        <LinearProgress
-          sx={{ width: "100%", position: "fixed" }}
-          color="primary"
+    <PageShell loading={loading}>
+      <Box mb={4}>
+        <TextField
+          fullWidth
+          autoFocus
+          autoComplete="off"
+          defaultValue={initialSearch}
+          label="Pesquisar mangás..."
+          variant="standard"
+          size="medium"
+          sx={{
+            ".MuiFormLabel-root": { fontSize: "2.125rem", fontWeight: 500 },
+            ".MuiInput-input": { marginTop: "1.2rem" },
+          }}
+          onChange={(event) => setSearch(event.target.value.trim())}
         />
+      </Box>
+
+      <FilterBar filters={filters} setFilters={setFilters} />
+
+      {hasSearch ? (
+        <AnimeGrid
+          media="manga"
+          title="Mangás pesquisados"
+          loading={loading}
+          animeData={searchedList as ResponseApiProps}
+          getAnimeData={getMangaSearchedData}
+          resetToken={filtersToken}
+          emptyMessage={`Nenhum mangá encontrado para "${debouncedSearch}".`}
+        />
+      ) : (
+        <Typography>
+          Digite no campo acima pelo menos {MIN_SEARCH_LENGTH} caracteres para
+          realizar uma pesquisa!
+        </Typography>
       )}
-      <Navbar />
-      <Card
-        sx={{
-          minHeight: "calc(100vh - 108px)",
-          borderRadius: 0,
-          p: 5,
-        }}
-      >
-        <Grid container>
-          <Grid
-            item
-            display="flex"
-            flexWrap="wrap"
-            width="100%"
-            gap={1}
-            mt={1}
-            mb={5}
-          >
-            <TextField
-              fullWidth
-              autoFocus
-              autoComplete="off"
-              label="Pesquisar mangás..."
-              variant="standard"
-              size="medium"
-              sx={{
-                ".MuiFormLabel-root": { fontSize: "2.125rem", fontWeight: 500 },
-                ".MuiInput-input": { marginTop: "1.2rem" },
-              }}
-              onChange={(event) => handleSearch(event.target.value)}
-            />
-          </Grid>
-        </Grid>
-        {debouncedSearch.length > 2 ? (
-          <AnimeGrid
-            media="manga"
-            title="Mangás pesquisados"
-            loading={loading}
-            animeData={searchedList as ResponseApiProps}
-            getAnimeData={getMangaSearchedData}
-            resetToken={debouncedSearch}
-            emptyMessage={`Nenhum mangá encontrado para "${debouncedSearch}".`}
-          />
-        ) : (
-          <Grid item sx={{ pl: "0px !important" }}>
-            <Typography>
-              Digite no campo acima pelo menos 3 caracteres para realizar uma
-              pesquisa!
-            </Typography>
-          </Grid>
-        )}
-      </Card>
-      <Footer />
-    </Box>
+    </PageShell>
   );
 };
 

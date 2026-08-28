@@ -1,11 +1,11 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
-import Footer from "@/components/Footer";
-import GenderFilter from "@/components/GenderFilter";
-import Navbar from "@/components/Navbar";
+import FilterBar from "@/components/FilterBar";
+import HomeHero from "@/components/HomeHero";
+import PageShell from "@/components/PageShell";
 import AnilistService from "@/services/AnilistService";
-import { Box, Card, LinearProgress, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { useCallback, useState } from "react";
 
 const HomeView = () => {
@@ -44,57 +44,39 @@ const HomeView = () => {
   );
 
   const filtersToken = filters.join(",");
+  // O destaque é o primeiro dos populares, que a própria home já carregou.
+  const featured = popularAnimeList?.results?.[0];
 
   return (
-    <Box width="100%">
-      {(popularLoading || recentLoading) && (
-        <LinearProgress
-          sx={{ width: "100%", position: "fixed" }}
-          color="primary"
+    <PageShell loading={popularLoading || recentLoading}>
+      <HomeHero anime={featured} />
+
+      <FilterBar filters={filters} setFilters={setFilters} />
+
+      <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 8, md: 12 } }}>
+        <AnimeGrid
+          title="Animes Populares"
+          loading={popularLoading}
+          animeData={popularAnimeList as ResponseApiProps}
+          getAnimeData={getAnimePopularData}
+          resetToken={filtersToken}
         />
-      )}
-      <Navbar />
-      <Card
-        sx={{
-          minHeight: "calc(100vh - 108px)",
-          borderRadius: 0,
-          p: 5,
-        }}
-      >
-        <GenderFilter filters={filters} setFilters={setFilters} />
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
-          <AnimeGrid
-            title="Animes Populares"
-            loading={popularLoading}
-            animeData={popularAnimeList as ResponseApiProps}
-            getAnimeData={getAnimePopularData}
-            resetToken={filtersToken}
-          />
-          <AnimeGrid
-            title={filters.length ? "Em Exibição" : "Episódios Recentes"}
-            loading={recentLoading}
-            animeData={recentAnimeList as ResponseApiProps}
-            getAnimeData={getAnimeRecentData}
-            resetToken={filtersToken}
-          />
-        </Box>
-        <Typography
-          variant="caption"
-          color="text.disabled"
-          display="block"
-          mt={6}
-        >
-          Catálogo e avaliações fornecidos pelo AniList.
-        </Typography>
-      </Card>
-      <Footer />
-    </Box>
+        <AnimeGrid
+          title={filters.length ? "Em Exibição" : "Episódios Recentes"}
+          loading={recentLoading}
+          animeData={recentAnimeList as ResponseApiProps}
+          getAnimeData={getAnimeRecentData}
+          resetToken={filtersToken}
+          // Sem filtro a lista é a grade de exibição, com número de episódio e
+          // horário — dados que só o card de lançamento mostra.
+          variant={filters.length ? "poster" : "release"}
+        />
+      </Box>
+
+      <Typography variant="caption" color="text.disabled" display="block" mt={6}>
+        Catálogo e avaliações fornecidos pelo AniList.
+      </Typography>
+    </PageShell>
   );
 };
 

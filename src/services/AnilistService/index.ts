@@ -1,5 +1,6 @@
 import {
   ANIME_DETAILS_QUERY,
+  FRANCHISE_QUERY,
   POPULAR_ANIME_QUERY,
   RECENT_ANIME_QUERY,
   RECENT_EPISODES_QUERY,
@@ -12,7 +13,7 @@ import {
   anilistRequest,
   genresKey,
 } from "./client";
-import { cleanDescription } from "@/utils/anime";
+import { cleanDescription, formatLabel } from "@/utils/anime";
 import { ONE_HOUR, createCache } from "@/utils/cache";
 
 const PER_PAGE = 24;
@@ -45,7 +46,7 @@ const listCache = createCache<ResponseApiProps>({
 const detailsCache = createCache<AnimeDetailsProps | null>({
   // O sufixo muda junto com o formato da ficha: fichas guardadas antes de um
   // campo novo existir seguiriam válidas por uma hora, sem ele.
-  namespace: "anilist:details:v3",
+  namespace: "anilist:details:v4",
   ttl: LIST_TTL,
   persist: true,
 });
@@ -61,6 +62,32 @@ const airingWindowCache = createCache<AnimeProps[]>({
 });
 
 const AIRING_WINDOW_KEY = "current";
+
+/**
+ * Temporadas de uma franquia. Montar a lista custa uma requisição por elo, e o
+ * resultado é o mesmo para qualquer temporada da mesma sequência — por isso
+ * vale a pena persistir.
+ */
+const franchiseCache = createCache<FranchiseSeasonProps[]>({
+  namespace: "anilist:franchise:v1",
+  ttl: LIST_TTL,
+  persist: true,
+});
+
+/**
+ * Só estas relações continuam a mesma história. `SIDE_STORY` e `ALTERNATIVE`
+ * trariam spin-offs e recontagens para o meio da lista de temporadas.
+ */
+const SEASON_RELATIONS = new Set(["PREQUEL", "SEQUEL", "PARENT"]);
+
+/**
+ * Teto de elos visitados. Cada um é uma requisição, e o AniList permite 90 por
+ * minuto por IP — franquias muito longas param aqui em vez de gastar a cota.
+ */
+const MAX_FRANCHISE_NODES = 8;
+
+/** Formatos que contam como temporada numerada; o resto vira "Filme", "OVA"... */
+const NUMBERED_FORMATS = new Set(["TV", "TV_SHORT"]);
 
 class AnilistServiceClass {
   private request = anilistRequest;
@@ -181,6 +208,104 @@ class AnilistServiceClass {
     );
   }
 
+  /**
+   * Temporadas da franquia, em ordem cronológica. O AniList trata cada
+   * temporada como uma obra independente, então a sequência inteira só aparece
+   * percorrendo as relações de prequela/sequência a partir da obra aberta.
+   *
+   * Sempre chame isto depois de a ficha já ter renderizado: são várias
+   * requisições encadeadas e nenhuma tela deve esperar por elas.
+   */
+  async getFranchiseSeasons(
+    anilistId: string | number
+  ): Promise<FranchiseSeasonProps[]> {
+    const id = Number(anilistId);
+    if (!id) return [];
+
+    return franchiseCache.resolve(
+      `franchise:${id}`,
+      () => this.fetchFranchiseSeasons(id),
+      { shouldStore: (seasons) => seasons.length > 0 }
+    );
+  }
+
+  /**
+   * Busca em largura pela cadeia da franquia. Cada elo custa uma requisição, e
+   * o percurso para no teto de nós — o que já foi encontrado é devolvido do
+   * mesmo jeito, porque uma lista parcial ainda navega melhor que nenhuma.
+   */
+  private async fetchFranchiseSeasons(
+    rootId: number
+  ): Promise<FranchiseSeasonProps[]> {
+    const visited = new Set<number>([rootId]);
+    const queue: number[] = [rootId];
+    const nodes: AnilistMedia[] = [];
+
+    while (queue.length && visited.size <= MAX_FRANCHISE_NODES) {
+      const currentId = queue.shift();
+      if (currentId === undefined) break;
+
+      const data = await this.request<{ Media: AnilistMedia }>(FRANCHISE_QUERY, {
+        id: currentId,
+      });
+      const media = data?.Media;
+      if (!media) continue;
+
+      nodes.push(media);
+
+      for (const edge of media.relations?.edges ?? []) {
+        const neighbourId = edge?.node?.id;
+        if (!neighbourId || visited.has(neighbourId)) continue;
+        if (!SEASON_RELATIONS.has(edge.relationType ?? "")) continue;
+        // As relações também apontam para mangás; só nos interessa a animação.
+        if (edge.node?.type && edge.node.type !== "ANIME") continue;
+
+        visited.add(neighbourId);
+        queue.push(neighbourId);
+      }
+    }
+
+    // Uma obra sozinha não é uma franquia: a tela usa o vazio para não montar
+    // o seletor de temporadas à toa.
+    if (nodes.length < 2) return [];
+
+    return this.toFranchiseSeasons(nodes, rootId);
+  }
+
+  private toFranchiseSeasons(
+    nodes: AnilistMedia[],
+    currentId: number
+  ): FranchiseSeasonProps[] {
+    const year = (media: AnilistMedia) =>
+      media.seasonYear ?? media.startDate?.year ?? null;
+
+    const ordered = [...nodes].sort(
+      (a, b) => (year(a) ?? Infinity) - (year(b) ?? Infinity)
+    );
+
+    // Só as séries entram na numeração; filmes e OVAs ficam com o formato como
+    // rótulo, para não empurrar a contagem das temporadas de verdade.
+    let seasonNumber = 0;
+
+    return ordered.map((media) => {
+      const isNumbered = NUMBERED_FORMATS.has(media.format ?? "");
+      if (isNumbered) seasonNumber += 1;
+
+      return {
+        id: String(media.id),
+        title: media.title?.romaji ?? media.title?.english ?? "Sem título",
+        label: isNumbered
+          ? `Temporada ${seasonNumber}`
+          : formatLabel(media.format) ?? "Especial",
+        year: year(media),
+        format: media.format ?? null,
+        cover: media.coverImage?.large ?? null,
+        totalEpisodes: media.episodes ?? 0,
+        isCurrent: media.id === currentId,
+      };
+    });
+  }
+
   private async fetchAnimeDetails(
     id: number
   ): Promise<AnimeDetailsProps | null> {
@@ -206,7 +331,7 @@ class AnilistServiceClass {
       rankings: media.rankings ?? [],
       trailer: this.toTrailer(media),
       crunchyroll: this.toCrunchyroll(media),
-      episodeTitles: this.toEpisodeTitles(media),
+      episodes: this.toEpisodes(media),
       availableEpisodes: this.toAvailableEpisodes(media),
       nextEpisode: this.toNextEpisode(media),
     };
@@ -359,22 +484,40 @@ class AnilistServiceClass {
   }
 
   /**
-   * Títulos dos episódios, aceitando qualquer serviço de streaming: o texto é
-   * o mesmo em todos e o que interessa aqui é a cobertura. O AniList só
-   * cadastra uma janela de episódios das séries longas, então o título nem
-   * sempre existe — a página cai só no número quando falta.
+   * Episódios que o AniList conhece, aceitando qualquer serviço de streaming:
+   * o rótulo é o mesmo em todos e o que interessa aqui é a cobertura. Só uma
+   * janela dos episódios das séries longas está cadastrada, então essa lista é
+   * incompleta de propósito — o TMDB completa o resto em pt-BR, e a tela cai no
+   * número puro para o que sobrar.
+   *
+   * Uma entrada vale a pena mesmo sem título, desde que traga a imagem.
    */
-  private toEpisodeTitles(media: AnilistMedia): Record<number, string> {
-    const titles: Record<number, string> = {};
+  private toEpisodes(media: AnilistMedia): Record<number, EpisodeInfoProps> {
+    const episodes: Record<number, EpisodeInfoProps> = {};
 
-    for (const episode of media.streamingEpisodes ?? []) {
-      const parsed = this.parseStreamingEpisode(episode.title);
-      if (parsed?.title && !titles[parsed.number]) {
-        titles[parsed.number] = parsed.title;
-      }
+    for (const streaming of media.streamingEpisodes ?? []) {
+      const parsed = this.parseStreamingEpisode(streaming.title);
+      if (!parsed) continue;
+
+      const thumbnail = streaming.thumbnail?.trim();
+      if (!parsed.title && !thumbnail) continue;
+
+      // O primeiro registro vence: os repetidos costumam ser dublagens.
+      const current = episodes[parsed.number];
+      if (current?.title && current.thumbnail) continue;
+
+      episodes[parsed.number] = {
+        number: parsed.number,
+        title: current?.title ?? parsed.title,
+        thumbnail:
+          current?.thumbnail ?? (thumbnail ? this.toSecureUrl(thumbnail) : null),
+        airedAt: null,
+        duration: media.duration ?? null,
+        overview: null,
+      };
     }
 
-    return titles;
+    return episodes;
   }
 
   /** O AniList ainda guarda vários links da Crunchyroll em http. */

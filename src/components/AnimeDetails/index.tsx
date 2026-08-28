@@ -1,3 +1,5 @@
+"use client";
+
 import { AnimeScoreRating } from "@/components/AnimeScore";
 import AnimeTrailer from "@/components/AnimeTrailer";
 import MetaItem from "@/components/MetaItem";
@@ -20,12 +22,40 @@ import {
   Typography,
 } from "@mui/material";
 import Image from "next/image";
+import { useState } from "react";
+
+/** Acima disso a sinopse domina a ficha e empurra tudo para fora da tela. */
+const DESCRIPTION_CLAMP_LINES = 5;
+/** Aproximação de quantos caracteres cabem no clamp, para decidir o botão. */
+const DESCRIPTION_CLAMP_CHARS = 420;
 
 const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   const allTimeRankings = anime.rankings.filter((ranking) => ranking.allTime);
   const seasonText = [seasonLabel(anime.season), anime.seasonYear]
     .filter(Boolean)
     .join(" de ");
+
+  const metaItems = [
+    { label: "Formato", value: formatLabel(anime.format) },
+    { label: "Situação", value: statusLabel(anime.status) },
+    {
+      label: "Episódios",
+      value: anime.totalEpisodes ? String(anime.totalEpisodes) : null,
+    },
+    { label: "Duração", value: anime.duration ? `${anime.duration} min` : null },
+    { label: "Temporada", value: seasonText || null },
+    { label: "Estúdio", value: anime.studios.join(", ") || null },
+    {
+      label: "Popularidade",
+      value: anime.popularity
+        ? `${anime.popularity.toLocaleString("pt-BR")} usuários`
+        : null,
+    },
+  ].filter((item): item is { label: string; value: string } => !!item.value);
+
+  const description = anime.description ?? "";
+  const isDescriptionLong = description.length > DESCRIPTION_CLAMP_CHARS;
 
   return (
     <Box width="100%">
@@ -95,6 +125,9 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
             </Stack>
           )}
 
+          {/* Os itens são filtrados antes de virar JSX: o Stack conta cada
+              filho para posicionar os divisores, e um MetaItem que devolve
+              null deixaria a barrinha sobrando no meio da linha. */}
           <Stack
             direction="row"
             flexWrap="wrap"
@@ -103,29 +136,9 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
             mb={3}
             divider={<Divider orientation="vertical" flexItem />}
           >
-            <MetaItem label="Formato" value={formatLabel(anime.format)} />
-            <MetaItem label="Situação" value={statusLabel(anime.status)} />
-            <MetaItem
-              label="Episódios"
-              value={anime.totalEpisodes ? String(anime.totalEpisodes) : null}
-            />
-            <MetaItem
-              label="Duração"
-              value={anime.duration ? `${anime.duration} min` : null}
-            />
-            <MetaItem label="Temporada" value={seasonText || null} />
-            <MetaItem
-              label="Estúdio"
-              value={anime.studios.join(", ") || null}
-            />
-            <MetaItem
-              label="Popularidade"
-              value={
-                anime.popularity
-                  ? `${anime.popularity.toLocaleString("pt-BR")} usuários`
-                  : null
-              }
-            />
+            {metaItems.map((item) => (
+              <MetaItem key={item.label} label={item.label} value={item.value} />
+            ))}
           </Stack>
 
           {!!anime.nextEpisode && (
@@ -148,14 +161,35 @@ const AnimeDetails = ({ anime }: { anime: AnimeDetailsProps }) => {
             </Stack>
           )}
 
-          {!!anime.description && (
-            <Typography
-              variant="body2"
-              sx={{ whiteSpace: "pre-line", maxWidth: 900 }}
-              mb={3}
-            >
-              {anime.description}
-            </Typography>
+          {!!description && (
+            <Box mb={3} maxWidth={900}>
+              <Typography
+                variant="body2"
+                sx={{
+                  whiteSpace: "pre-line",
+                  // O clamp só entra em sinopses longas: aplicá-lo sempre
+                  // cortaria as curtas na última linha sem necessidade.
+                  ...(isDescriptionLong &&
+                    !descriptionOpen && {
+                      display: "-webkit-box",
+                      WebkitLineClamp: DESCRIPTION_CLAMP_LINES,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }),
+                }}
+              >
+                {description}
+              </Typography>
+              {isDescriptionLong && (
+                <Button
+                  size="small"
+                  onClick={() => setDescriptionOpen((open) => !open)}
+                  sx={{ mt: 0.5, px: 0 }}
+                >
+                  {descriptionOpen ? "Ler menos" : "Ler mais"}
+                </Button>
+              )}
+            </Box>
           )}
 
           {!!anime.trailer && <AnimeTrailer trailer={anime.trailer} />}

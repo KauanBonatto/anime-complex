@@ -1,11 +1,10 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
-import Footer from "@/components/Footer";
-import GenderFilter from "@/components/GenderFilter";
-import Navbar from "@/components/Navbar";
+import FilterBar from "@/components/FilterBar";
+import PageShell from "@/components/PageShell";
 import MangaService from "@/services/MangaService";
-import { Box, Card, LinearProgress, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { useCallback, useState } from "react";
 
 const MangaHomeView = () => {
@@ -62,29 +61,11 @@ const MangaHomeView = () => {
   const filtersToken = filters.join(",");
 
   return (
-    <Box width="100%">
-      {(popularLoading || topRatedLoading || recentLoading) && (
-        <LinearProgress
-          sx={{ width: "100%", position: "fixed" }}
-          color="primary"
-        />
-      )}
-      <Navbar />
-      <Card
-        sx={{
-          minHeight: "calc(100vh - 108px)",
-          borderRadius: 0,
-          p: 5,
-        }}
+    <PageShell loading={popularLoading || topRatedLoading || recentLoading}>
+      <FilterBar filters={filters} setFilters={setFilters} />
+      <Box
+        sx={{ display: "flex", flexDirection: "column", gap: { xs: 8, md: 12 } }}
       >
-        <GenderFilter filters={filters} setFilters={setFilters} />
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
           <AnimeGrid
             media="manga"
             title="Mangás Populares"
@@ -112,18 +93,11 @@ const MangaHomeView = () => {
             resetToken={filtersToken}
             emptyMessage="Nenhum lançamento recente com os parâmetros informados!"
           />
-        </Box>
-        <Typography
-          variant="caption"
-          color="text.disabled"
-          display="block"
-          mt={6}
-        >
-          Catálogo e avaliações fornecidos pelo AniList.
-        </Typography>
-      </Card>
-      <Footer />
-    </Box>
+      </Box>
+      <Typography variant="caption" color="text.disabled" display="block" mt={6}>
+        Catálogo e avaliações fornecidos pelo AniList.
+      </Typography>
+    </PageShell>
   );
 };
 

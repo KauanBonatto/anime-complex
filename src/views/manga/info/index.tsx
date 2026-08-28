@@ -1,11 +1,10 @@
 "use client";
 
-import Footer from "@/components/Footer";
 import MangaDetails from "@/components/MangaDetails";
-import Navbar from "@/components/Navbar";
+import PageShell from "@/components/PageShell";
 import MangaDexService from "@/services/MangaDexService";
 import MangaService from "@/services/MangaService";
-import { Box, Card, Grid, LinearProgress, Skeleton } from "@mui/material";
+import { Grid, Skeleton } from "@mui/material";
 import { notFound } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -14,7 +13,7 @@ const MangaInfoView = ({ params }: { params: { manga_id: string } }) => {
   const [loading, setLoading] = useState(true);
   const [notFoundManga, setNotFoundManga] = useState(false);
   const [mangaDetails, setMangaDetails] = useState<MangaDetailsProps | null>(
-    null
+    null,
   );
 
   const getMangaInfoData = useCallback(async () => {
@@ -26,7 +25,7 @@ const MangaInfoView = ({ params }: { params: { manga_id: string } }) => {
     setMangaDetails(
       mangaDetailsData
         ? await MangaDexService.localizeDescription(mangaDetailsData)
-        : null
+        : null,
     );
     setNotFoundManga(!mangaDetailsData);
     setLoading(false);
@@ -39,49 +38,33 @@ const MangaInfoView = ({ params }: { params: { manga_id: string } }) => {
   if (notFoundManga) notFound();
 
   return (
-    <Box width="100%">
+    <PageShell loading={loading}>
       {loading && (
-        <LinearProgress
-          sx={{ width: "100%", position: "fixed" }}
-          color="primary"
-        />
+        <Grid container spacing={4}>
+          <Grid item xs={12}>
+            <Skeleton variant="rounded" height={240} />
+          </Grid>
+          <Grid item xs={12} sm="auto">
+            <Skeleton variant="rounded" width={230} height={325} />
+          </Grid>
+          <Grid item xs={12} sm>
+            <Skeleton variant="text" height={50} sx={{ maxWidth: 420 }} />
+            <Skeleton variant="text" sx={{ maxWidth: 260 }} />
+            <Skeleton variant="text" sx={{ mt: 3 }} />
+            <Skeleton variant="text" />
+            <Skeleton variant="text" sx={{ width: "70%" }} />
+          </Grid>
+        </Grid>
       )}
-      <Navbar />
-      <Card
-        sx={{
-          minHeight: "calc(100vh - 108px)",
-          borderRadius: 0,
-          p: 5,
-        }}
-      >
-        {loading && (
-          <Grid container spacing={4}>
-            <Grid item xs={12}>
-              <Skeleton variant="rounded" height={240} />
-            </Grid>
-            <Grid item xs={12} sm="auto">
-              <Skeleton variant="rounded" width={230} height={325} />
-            </Grid>
-            <Grid item xs={12} sm>
-              <Skeleton variant="text" height={50} sx={{ maxWidth: 420 }} />
-              <Skeleton variant="text" sx={{ maxWidth: 260 }} />
-              <Skeleton variant="text" sx={{ mt: 3 }} />
-              <Skeleton variant="text" />
-              <Skeleton variant="text" sx={{ width: "70%" }} />
-            </Grid>
-          </Grid>
-        )}
 
-        {mangaDetails && (
-          <Grid container>
-            <Grid item width="100%" mt={1} mb={5}>
-              <MangaDetails manga={mangaDetails} />
-            </Grid>
+      {mangaDetails && (
+        <Grid container>
+          <Grid item width="100%" mt={1} mb={5}>
+            <MangaDetails manga={mangaDetails} />
           </Grid>
-        )}
-      </Card>
-      <Footer />
-    </Box>
+        </Grid>
+      )}
+    </PageShell>
   );
 };
 

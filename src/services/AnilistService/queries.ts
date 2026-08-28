@@ -119,6 +119,7 @@ export const ANIME_DETAILS_QUERY = `
         title
         url
         site
+        thumbnail
       }
       description(asHtml: false)
       studios(isMain: true) {
@@ -131,6 +132,42 @@ export const ANIME_DETAILS_QUERY = `
         type
         context
         allTime
+      }
+    }
+  }
+`;
+
+/**
+ * Um elo da franquia. No AniList cada temporada é uma obra separada, então a
+ * lista de temporadas sai daqui: o nó pedido mais os IDs vizinhos, que o
+ * serviço percorre para montar a sequência inteira.
+ */
+export const FRANCHISE_QUERY = `
+  query Franchise($id: Int) {
+    Media(id: $id, type: ANIME) {
+      id
+      title {
+        romaji
+        english
+      }
+      coverImage {
+        large
+      }
+      format
+      status
+      episodes
+      seasonYear
+      startDate {
+        year
+      }
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            type
+          }
+        }
       }
     }
   }

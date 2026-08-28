@@ -7,11 +7,17 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { Box, Button, Stack, Tooltip, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 
+/**
+ * O player era fixo em 900x506 no meio da página. Agora ele preenche a coluna
+ * em que estiver — que em telas grandes é mais larga que isso — e mantém o
+ * formato pela proporção, sem altura fixa.
+ */
 const PLAYER_STYLE = {
-  maxWidth: "100%",
-  maxHeight: "calc(100vh - 100px)",
-  width: 900,
-  height: 506,
+  display: "block",
+  width: "100%",
+  height: "auto",
+  aspectRatio: "16 / 9",
+  maxHeight: "calc(100vh - 160px)",
   border: "none",
   borderRadius: 8,
   backgroundColor: "#000",
@@ -74,7 +80,7 @@ const EpisodePlayer = ({
   const hasChoice = options.length + (crunchyroll ? 1 : 0) > 1;
 
   return (
-    <Box width="100%" textAlign="center">
+    <Box width="100%">
       {!selectedProvider ? (
         <Typography color="text.secondary" py={4}>
           Os players deste episódio só abrem em uma aba nova.
@@ -137,7 +143,7 @@ const EpisodePlayer = ({
         </Typography>
       )}
 
-      <Stack alignItems="center" gap={1.5} mt={3}>
+      <Stack alignItems="flex-start" gap={1.5} mt={3}>
         <Typography variant="subtitle2" color="text.disabled">
           {hasChoice && " Escolha por onde assistir"}
         </Typography>
@@ -145,7 +151,6 @@ const EpisodePlayer = ({
         <Stack
           direction="row"
           flexWrap="wrap"
-          justifyContent="center"
           gap={1}
           aria-label="Players disponíveis"
         >

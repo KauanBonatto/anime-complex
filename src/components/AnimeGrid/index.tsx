@@ -13,6 +13,7 @@ const AnimeGrid = ({
   resetToken,
   emptyMessage = "Nenhum anime encontrado com os parâmetros informados!",
   media = "anime",
+  variant = "poster",
 }: AnimeGridProps) => {
   const theme = useTheme();
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -42,16 +43,23 @@ const AnimeGrid = ({
 
   const hasResults = !loading && (animeData?.results?.length ?? 0) > 0;
 
+  const isRelease = variant === "release";
+
   // Colunas fluidas: os cards nunca encostam porque o gap é fixo e a largura
-  // de cada coluna se ajusta ao espaço disponível.
+  // de cada coluna se ajusta ao espaço disponível. O card de lançamento é
+  // horizontal, então pede colunas bem mais largas que o da capa.
   const gridSx = {
     display: "grid",
     width: "100%",
-    gap: 3,
-    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+    gap: isRelease ? 2 : 3,
+    gridTemplateColumns: isRelease
+      ? "repeat(auto-fill, minmax(300px, 1fr))"
+      : "repeat(auto-fill, minmax(180px, 1fr))",
     [theme.breakpoints.down("sm")]: {
       gap: 2,
-      gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+      gridTemplateColumns: isRelease
+        ? "1fr"
+        : "repeat(auto-fill, minmax(140px, 1fr))",
     },
   } as const;
 
@@ -75,21 +83,35 @@ const AnimeGrid = ({
 
       <Box sx={gridSx}>
         {loading &&
-          SKELETON_PLACEHOLDERS.map((_, index) => (
-            <Box key={index} width="100%">
-              <Skeleton
-                variant="rounded"
-                sx={{ width: "100%", height: "auto", aspectRatio: "180 / 254" }}
-              />
-              <Skeleton variant="text" sx={{ mt: 0.5 }} />
-              <Skeleton variant="text" sx={{ width: "80%", mt: 0.5 }} />
-            </Box>
-          ))}
+          SKELETON_PLACEHOLDERS.map((_, index) =>
+            isRelease ? (
+              <Box key={index} display="flex" gap={1.5} width="100%" p={1}>
+                <Skeleton
+                  variant="rounded"
+                  sx={{ flexShrink: 0, width: 72, aspectRatio: "180 / 254" }}
+                />
+                <Box flexGrow={1}>
+                  <Skeleton variant="text" />
+                  <Skeleton variant="text" sx={{ width: "60%" }} />
+                  <Skeleton variant="text" sx={{ width: "35%" }} />
+                </Box>
+              </Box>
+            ) : (
+              <Box key={index} width="100%">
+                <Skeleton
+                  variant="rounded"
+                  sx={{ width: "100%", height: "auto", aspectRatio: "180 / 254" }}
+                />
+                <Skeleton variant="text" sx={{ mt: 0.5 }} />
+                <Skeleton variant="text" sx={{ width: "80%", mt: 0.5 }} />
+              </Box>
+            )
+          )}
 
         {hasResults &&
           animeData.results.map((anime, index) => (
             <Link key={anime.id + index} href={`/${media}/${anime.id}`}>
-              <AnimeCard anime={anime} media={media} />
+              <AnimeCard anime={anime} media={media} variant={variant} />
             </Link>
           ))}
       </Box>

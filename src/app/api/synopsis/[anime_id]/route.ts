@@ -13,7 +13,9 @@ import { NextResponse } from "next/server";
 const SYNOPSIS_TTL = ONE_DAY;
 
 const synopsisCache = createCache<SynopsisResult>({
-  namespace: "synopsis",
+  // O sufixo muda junto com o formato da resposta: respostas guardadas antes de
+  // os episódios trazerem imagem seguiriam válidas por um dia, sem ele.
+  namespace: "synopsis:v2",
   ttl: SYNOPSIS_TTL,
   maxEntries: 500,
 });
@@ -41,7 +43,7 @@ export async function GET(
     return NextResponse.json({
       description: null,
       title: null,
-      episodeTitles: {},
+      episodes: {},
       source: null,
     });
   }
@@ -60,7 +62,7 @@ export async function GET(
     // Resposta vazia pode ser o TMDB fora do ar; tentamos de novo na próxima.
     {
       shouldStore: (result) =>
-        !!result.description || Object.keys(result.episodeTitles).length > 0,
+        !!result.description || Object.keys(result.episodes).length > 0,
     }
   );
 

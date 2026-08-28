@@ -143,6 +143,53 @@ export const airingDateLabel = (airingAt: number) => {
 };
 
 /**
+ * "21 de setembro de 2025" — a data de exibição de um episódio.
+ *
+ * Formatada em UTC de propósito. O TMDB informa uma data de calendário, sem
+ * horário, que o servidor converte para a meia-noite UTC; renderizá-la no fuso
+ * do visitante jogaria todo mundo a oeste de Greenwich para o dia anterior.
+ */
+export const episodeDateLabel = (airedAt: number) =>
+  new Date(airedAt * 1000).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/**
+ * Quanto tempo faz, em texto curto: "há 3 h", "há 2 dias". Usado na lista de
+ * episódios recentes, onde a data exata importa menos que a sensação de
+ * novidade — por isso uma unidade só.
+ */
+export const timeAgoLabel = (airedAt: number) => {
+  const seconds = Math.floor(Date.now() / 1000) - airedAt;
+  if (seconds < 60) return "agora";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `há ${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `há ${days} ${days === 1 ? "dia" : "dias"}`;
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `há ${weeks} ${weeks === 1 ? "semana" : "semanas"}`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `há ${months} ${months === 1 ? "mês" : "meses"}`;
+
+  const years = Math.floor(days / 365);
+  return `há ${years} ${years === 1 ? "ano" : "anos"}`;
+};
+
+/** "24 min" — a duração de um episódio. */
+export const durationLabel = (minutes?: number | null) =>
+  minutes && minutes > 0 ? `${minutes} min` : null;
+
+/**
  * Tempo restante em texto: "2 dias e 5 horas", "5 horas e 30 minutos".
  * Os minutos só aparecem quando falta menos de um dia, para não poluir.
  */

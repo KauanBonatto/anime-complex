@@ -39,7 +39,16 @@ interface AnimeGridProps {
   emptyMessage?: string;
   /** Padrão: "anime". */
   media?: MediaType;
+  /** Padrão: "poster". "release" usa o card horizontal de episódio recente. */
+  variant?: AnimeCardVariant;
 }
+
+/**
+ * Como o card do catálogo se apresenta. "poster" é a capa vertical de sempre;
+ * "release" é o card horizontal usado em "Episódios Recentes", que dá destaque
+ * ao número do episódio e ao horário em que ele foi ao ar.
+ */
+type AnimeCardVariant = "poster" | "release";
 
 /** Ficha completa vinda do AniList (dados + avaliação). */
 interface AnimeDetailsProps extends AnimeProps {
@@ -56,12 +65,45 @@ interface AnimeDetailsProps extends AnimeProps {
   trailer: AnimeTrailerProps | null;
   /** Onde assistir oficialmente na Crunchyroll, quando o anime está lá. */
   crunchyroll: CrunchyrollProps | null;
-  /** Título de cada episódio que o AniList conhece, por número. */
-  episodeTitles: Record<number, string>;
+  /** Dados de cada episódio conhecido, por número. */
+  episodes: Record<number, EpisodeInfoProps>;
   /** Episódios já exibidos, base para montar a lista de episódios. */
   availableEpisodes: number;
   /** Só existe em animes em exibição ou ainda não lançados. */
   nextEpisode: NextEpisodeProps | null;
+}
+
+/**
+ * Um episódio da obra. O AniList entrega título e thumbnail apenas dos
+ * episódios que tem cadastrados em `streamingEpisodes` — uma janela pequena
+ * nas séries longas — e o TMDB completa o resto já em pt-BR.
+ */
+interface EpisodeInfoProps {
+  number: number;
+  title: string | null;
+  thumbnail: string | null;
+  /** Epoch em segundos, quando a fonte conhece a data de exibição. */
+  airedAt: number | null;
+  /** Minutos. Cai para a duração média da série quando não há valor próprio. */
+  duration: number | null;
+  overview: string | null;
+}
+
+/**
+ * Uma temporada da franquia. No AniList cada temporada é uma obra separada,
+ * com ID próprio, então a lista é montada percorrendo as relações de sequência.
+ */
+interface FranchiseSeasonProps {
+  id: string;
+  title: string;
+  /** "Temporada 2", "Filme", "OVA" — vem da ordem e do formato. */
+  label: string;
+  year: number | null;
+  format: string | null;
+  cover: string | null;
+  totalEpisodes: number;
+  /** Verdadeiro na temporada que está aberta na tela. */
+  isCurrent: boolean;
 }
 
 /** Trailer do AniList, já convertido em endereço de embed. */

@@ -46,11 +46,24 @@ export interface AnilistMedia {
     title: string | null;
     url: string | null;
     site: string | null;
+    thumbnail?: string | null;
   }[] | null;
+  relations?: {
+    edges: AnilistRelationEdge[] | null;
+  } | null;
   nextAiringEpisode?: {
     episode: number;
     airingAt: number;
     timeUntilAiring: number;
+  } | null;
+}
+
+/** Uma relação entre obras: sequência, prequela, adaptação, spin-off... */
+export interface AnilistRelationEdge {
+  relationType: string | null;
+  node: {
+    id: number;
+    type?: string | null;
   } | null;
 }
 

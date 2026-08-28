@@ -46,19 +46,31 @@ interface TmdbRef {
   episodeOffset: number;
 }
 
+/** O que o TMDB sabe de um episódio, já traduzido e com a imagem montada. */
+export interface TmdbEpisode {
+  number: number;
+  title: string | null;
+  thumbnail: string | null;
+  /** Epoch em segundos, para casar com o formato que o AniList usa. */
+  airedAt: number | null;
+  /** Minutos. */
+  duration: number | null;
+  overview: string | null;
+}
+
 export interface SynopsisResult {
   description: string | null;
   /** Título em pt-BR, quando o TMDB tem um. */
   title: string | null;
-  /** Nome de cada episódio em pt-BR, por número. */
-  episodeTitles: Record<number, string>;
+  /** Dados de cada episódio em pt-BR, por número. */
+  episodes: Record<number, TmdbEpisode>;
   source: "tmdb" | null;
 }
 
 const EMPTY_RESULT: SynopsisResult = {
   description: null,
   title: null,
-  episodeTitles: {},
+  episodes: {},
   source: null,
 };
 
@@ -201,14 +213,24 @@ const toResult = (data: TmdbTitle | null): SynopsisResult => {
   return {
     description,
     title: text(data?.name) ?? text(data?.title),
-    episodeTitles: {},
+    episodes: {},
     source: "tmdb",
   };
 };
 
 interface TmdbSeason {
-  episodes?: { episode_number?: number; name?: string | null }[];
+  episodes?: {
+    episode_number?: number;
+    name?: string | null;
+    still_path?: string | null;
+    air_date?: string | null;
+    runtime?: number | null;
+    overview?: string | null;
+  }[];
 }
+
+/** Tamanho do still: largura suficiente para o card sem pesar na listagem. */
+const STILL_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
 /**
  * Sem tradução cadastrada o TMDB devolve "Episódio 5" como nome — repetir o
@@ -217,30 +239,60 @@ interface TmdbSeason {
 const isGenericEpisodeName = (name: string) =>
   /^epis[oó]dio\s+\d+$/i.test(name);
 
+/** "2025-09-21" -> epoch em segundos, que é o formato usado no resto do app. */
+const toEpoch = (date?: string | null): number | null => {
+  const value = text(date);
+  if (!value) return null;
+
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : null;
+};
+
 /**
- * Nomes dos episódios em pt-BR. Filmes não têm episódios, e a numeração do
- * AniList é por temporada — a mesma que o `season` do mapeamento aponta.
+ * Episódios em pt-BR. Filmes não têm episódios, e a numeração do AniList é por
+ * temporada — a mesma que o `season` do mapeamento aponta.
+ *
+ * Um episódio entra na lista mesmo sem nome traduzido, desde que traga imagem,
+ * data ou sinopse: o card usa o número como título e aproveita o resto.
  */
-const fetchEpisodeTitles = async (
+const fetchEpisodes = async (
   ref: TmdbRef
-): Promise<Record<number, string>> => {
+): Promise<Record<number, TmdbEpisode>> => {
   if (ref.kind !== "tv") return {};
 
   const season = await tmdbRequest<TmdbSeason>(
     `/tv/${ref.id}/season/${ref.season ?? 1}`
   );
 
-  const titles: Record<number, string> = {};
+  const episodes: Record<number, TmdbEpisode> = {};
   for (const episode of season?.episodes ?? []) {
-    const name = text(episode.name);
-    if (!name || !episode.episode_number || isGenericEpisodeName(name)) continue;
+    if (!episode.episode_number) continue;
 
     // Traz a numeração do TMDB para a do AniList, que é a exibida na tela.
     const number = episode.episode_number - ref.episodeOffset;
-    if (number > 0) titles[number] = name;
+    if (number <= 0) continue;
+
+    const name = text(episode.name);
+    const title = name && !isGenericEpisodeName(name) ? name : null;
+    const stillPath = text(episode.still_path);
+    const thumbnail = stillPath ? `${STILL_BASE_URL}${stillPath}` : null;
+    const airedAt = toEpoch(episode.air_date);
+    const overview = text(episode.overview);
+    const duration = episode.runtime && episode.runtime > 0 ? episode.runtime : null;
+
+    if (!title && !thumbnail && !airedAt && !overview) continue;
+
+    episodes[number] = {
+      number,
+      title,
+      thumbnail,
+      airedAt,
+      duration,
+      overview,
+    };
   }
 
-  return titles;
+  return episodes;
 };
 
 const fromRef = async (ref: TmdbRef): Promise<SynopsisResult> => {
@@ -377,7 +429,7 @@ export const getPtBrSynopsis = async ({
   }
 
   // Os episódios valem mesmo sem sinopse: são consultas independentes.
-  const episodeTitles = ref ? await fetchEpisodeTitles(ref) : {};
+  const episodes = ref ? await fetchEpisodes(ref) : {};
 
-  return { ...result, episodeTitles };
+  return { ...result, episodes };
 };
