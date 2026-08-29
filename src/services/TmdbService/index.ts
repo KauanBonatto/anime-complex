@@ -141,11 +141,14 @@ class TmdbServiceClass {
       })
       .catch(() => EMPTY);
 
+    // Conhecer o episódio não basta: a listagem da temporada demora a
+    // incorporar a imagem do mais recente, e é dele que esta lista vive. Sem
+    // imagem, vale insistir pela consulta dirigida.
     const conhecido = localized.episodes?.[episodeNumber];
-    if (conhecido) return conhecido;
+    if (conhecido?.thumbnail) return conhecido;
 
     const vizinhanca = await this.getEpisodesAround(anime, episodeNumber);
-    return vizinhanca[episodeNumber] ?? null;
+    return vizinhanca[episodeNumber] ?? conhecido ?? null;
   }
 
   /**

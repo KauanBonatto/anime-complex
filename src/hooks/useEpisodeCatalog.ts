@@ -42,7 +42,9 @@ export const useEpisodeCatalog = (
     if (!anime) return;
 
     for (const numero of chaveAncoras.split(",").map(Number)) {
-      if (!numero || base?.[numero]) continue;
+      // Conhecer o episódio não basta: a listagem da temporada demora a
+      // incorporar a imagem do mais recente. Sem imagem, ainda vale buscar.
+      if (!numero || base?.[numero]?.thumbnail) continue;
       if (pedidos.current.has(numero)) continue;
       if (pedidos.current.size >= MAX_BUSCAS) break;
 

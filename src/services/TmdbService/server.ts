@@ -180,15 +180,19 @@ const mappingWithinBudget = async (): Promise<Map<number, TmdbRef> | null> => {
  * A chave v4 do TMDB é um JWT e vai no header; a v3 é uma string simples e vai
  * na query. Aceitamos as duas para não errar na configuração.
  */
+/** Idioma de origem: o TMDB cadastra em inglês o que ainda não foi traduzido. */
+const FALLBACK_LANGUAGE = "en-US";
+
 const tmdbRequest = async <T>(
   path: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
+  language = "pt-BR"
 ): Promise<T | null> => {
   const key = process.env.TMDB_API_KEY;
   if (!key) return null;
 
   const url = new URL(`${TMDB_BASE_URL}${path}`);
-  url.searchParams.set("language", "pt-BR");
+  url.searchParams.set("language", language);
   for (const [name, value] of Object.entries(params)) {
     url.searchParams.set(name, value);
   }
@@ -246,7 +250,7 @@ const STILL_BASE_URL = "https://image.tmdb.org/t/p/w500";
  * número que a tela já mostra não ajuda ninguém, então descartamos.
  */
 const isGenericEpisodeName = (name: string) =>
-  /^epis[oó]dio\s+\d+$/i.test(name);
+  /^(epis[oó]dio|episode)\s+\d+$/i.test(name);
 
 /** "2025-09-21" -> epoch em segundos, que é o formato usado no resto do app. */
 const toEpoch = (date?: string | null): number | null => {
@@ -309,6 +313,53 @@ const fetchMovieAsEpisode = async (
   };
 };
 
+/**
+ * Completa com o título em inglês os episódios que o TMDB ainda não traduziu.
+ *
+ * Séries longas costumam ter só o nome original cadastrado: no Detetive Conan,
+ * mil cento e noventa e dois dos mil duzentos e doze episódios vêm como
+ * "Episódio N" em pt-BR e com o título de verdade em inglês. Mostrar o nome em
+ * inglês informa mais que repetir o número que a tela já exibe — é a mesma
+ * escolha que a sinopse já faz.
+ *
+ * Custa uma requisição por temporada, e só quando sobrou episódio sem título.
+ */
+const completeTitlesInEnglish = async (
+  showId: number,
+  seasonNumber: number,
+  episodes: Record<number, TmdbEpisode>,
+  toLocalNumber: (tmdbNumber: number) => number
+): Promise<void> => {
+  // Episódio que ainda não foi ao ar não tem título em idioma nenhum, e uma
+  // série em exibição sempre tem alguns agendados à frente. Sem esta ressalva a
+  // consulta em inglês dispararia em quase todo anime da temporada, sem nada a
+  // ganhar.
+  const agora = Math.floor(Date.now() / 1000);
+  const faltando = Object.values(episodes).some(
+    (episode) => !episode.title && (episode.airedAt === null || episode.airedAt <= agora)
+  );
+  if (!faltando) return;
+
+  const season = await tmdbRequest<TmdbSeason>(
+    `/tv/${showId}/season/${seasonNumber}`,
+    {},
+    FALLBACK_LANGUAGE
+  );
+
+  for (const raw of season?.episodes ?? []) {
+    if (!raw.episode_number) continue;
+
+    const number = toLocalNumber(raw.episode_number);
+    const atual = episodes[number];
+    if (!atual || atual.title) continue;
+
+    const name = text(raw.name);
+    if (!name || isGenericEpisodeName(name)) continue;
+
+    episodes[number] = { ...atual, title: name };
+  }
+};
+
 const fetchEpisodes = async (
   ref: TmdbRef
 ): Promise<Record<number, TmdbEpisode>> => {
@@ -330,6 +381,13 @@ const fetchEpisodes = async (
     const episode = toEpisode(raw, number);
     if (episode) episodes[number] = episode;
   }
+
+  await completeTitlesInEnglish(
+    ref.id,
+    ref.season ?? 1,
+    episodes,
+    (tmdbNumber) => tmdbNumber - ref.episodeOffset
+  );
 
   return episodes;
 };
@@ -360,10 +418,22 @@ interface TmdbShow {
  * dezenas de episódios vizinhos na mesma tela — buscar um por um seria uma
  * requisição por card.
  */
+/** Onde um episódio mora no TMDB: temporada e número de lá. */
+interface TmdbAlvo {
+  season: number;
+  number: number;
+}
+
+interface SeasonAroundResult {
+  episodes: Record<number, TmdbEpisode>;
+  /** Onde o episódio procurado ficou, para quem precisar voltar nele. */
+  alvo: TmdbAlvo | null;
+}
+
 const fetchSeasonAround = async (
   ref: TmdbRef,
   target: number
-): Promise<Record<number, TmdbEpisode>> => {
+): Promise<SeasonAroundResult> => {
   const show = await tmdbRequest<TmdbShow>(`/tv/${ref.id}`);
   const seasons = (show?.seasons ?? []).filter(
     (season) => (season.season_number ?? 0) > 0
@@ -375,7 +445,7 @@ const fetchSeasonAround = async (
     previous += season.episode_count ?? 0;
     if (target < first || target > previous) continue;
     // A temporada apontada pelo mapeamento já foi consultada e não tinha.
-    if (season.season_number === (ref.season ?? 1)) return {};
+    if (season.season_number === (ref.season ?? 1)) return { episodes: {}, alvo: null };
 
     const data = await tmdbRequest<TmdbSeason>(
       `/tv/${ref.id}/season/${season.season_number}`
@@ -397,10 +467,70 @@ const fetchSeasonAround = async (
       if (episode) episodes[number] = episode;
     }
 
-    return episodes;
+    await completeTitlesInEnglish(
+      ref.id,
+      season.season_number ?? 1,
+      episodes,
+      (tmdbNumber) => tmdbNumber + deslocamento
+    );
+
+    return {
+      episodes,
+      alvo: {
+        season: season.season_number ?? 1,
+        number: target - deslocamento,
+      },
+    };
   }
 
-  return {};
+  return { episodes: {}, alvo: null };
+};
+
+interface TmdbEpisodeDetail {
+  name?: string | null;
+  still_path?: string | null;
+}
+
+/**
+ * Imagem e título de um episódio, direto do recurso dele.
+ *
+ * A listagem da temporada demora a incorporar a imagem do episódio mais
+ * recente: no Detetive Conan, o que foi ao ar hoje vinha sem `still_path` na
+ * temporada e com imagem no próprio episódio. Como é sempre o mais novo que
+ * falta, e é justamente ele que abre "Episódios Recentes", vale a requisição a
+ * mais — só quando o episódio pedido veio incompleto.
+ *
+ * As duas informações moram em idiomas diferentes nesse caso: a imagem só
+ * aparece na consulta em pt-BR e o título só na versão em inglês, então cada
+ * uma é buscada onde existe.
+ */
+const fetchEpisodeDetail = async (
+  ref: TmdbRef,
+  alvo: TmdbAlvo,
+  precisaTitulo: boolean
+): Promise<{ thumbnail: string | null; title: string | null }> => {
+  const vazio = { thumbnail: null, title: null };
+  if (ref.kind !== "tv" || alvo.number <= 0) return vazio;
+
+  const caminho = `/tv/${ref.id}/season/${alvo.season}/episode/${alvo.number}`;
+  const episode = await tmdbRequest<TmdbEpisodeDetail>(caminho);
+  const still = text(episode?.still_path);
+  const thumbnail = still ? `${STILL_BASE_URL}${still}` : null;
+
+  const nomePt = text(episode?.name);
+  let title = nomePt && !isGenericEpisodeName(nomePt) ? nomePt : null;
+
+  if (!title && precisaTitulo) {
+    const original = await tmdbRequest<TmdbEpisodeDetail>(
+      caminho,
+      {},
+      FALLBACK_LANGUAGE
+    );
+    const nomeEn = text(original?.name);
+    if (nomeEn && !isGenericEpisodeName(nomeEn)) title = nomeEn;
+  }
+
+  return { thumbnail, title };
 };
 
 const fromRef = async (ref: TmdbRef): Promise<SynopsisResult> => {
@@ -655,8 +785,42 @@ export const getPtBrSynopsis = async ({
   // Os episódios valem mesmo sem sinopse: são consultas independentes.
   const episodes = ref ? await fetchEpisodes(ref) : {};
 
-  if (ref && episode && episode > 0 && !episodes[episode]) {
-    Object.assign(episodes, await fetchSeasonAround(ref, episode));
+  if (ref && episode && episode > 0) {
+    // Onde o episódio pedido deveria estar, segundo o mapeamento.
+    let alvo: TmdbAlvo | null =
+      ref.kind === "tv"
+        ? { season: ref.season ?? 1, number: episode + ref.episodeOffset }
+        : null;
+
+    if (!episodes[episode]) {
+      const vizinhanca = await fetchSeasonAround(ref, episode);
+      Object.assign(episodes, vizinhanca.episodes);
+      if (vizinhanca.alvo) alvo = vizinhanca.alvo;
+    }
+
+    // A listagem da temporada atrasa a imagem do episódio mais novo; o recurso
+    // do episódio já a tem.
+    const atual = episodes[episode];
+    if (alvo && !(atual?.thumbnail && atual?.title)) {
+      const detalhe = await fetchEpisodeDetail(ref, alvo, !atual?.title);
+
+      if (detalhe.thumbnail || detalhe.title) {
+        const base = atual ?? {
+          number: episode,
+          title: null,
+          thumbnail: null,
+          airedAt: null,
+          duration: null,
+          overview: null,
+        };
+
+        episodes[episode] = {
+          ...base,
+          thumbnail: base.thumbnail ?? detalhe.thumbnail,
+          title: base.title ?? detalhe.title,
+        };
+      }
+    }
   }
 
   return { ...result, episodes };
