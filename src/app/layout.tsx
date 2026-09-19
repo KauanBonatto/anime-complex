@@ -26,19 +26,24 @@ export default function RootLayout({
       <head>
         <title>Anime Complex</title>
         <meta name="robots" content="noindex" />
-        <meta
-          name="theme-color"
-          media="(prefers-color-scheme: light)"
-          content={themeColor.light}
-        />
-        <meta
-          name="theme-color"
-          media="(prefers-color-scheme: dark)"
-          content={themeColor.dark}
-        />
+        {/* O app abre sempre no claro, então a barra do navegador usa a cor
+            dele. Ela não acompanha uma troca manual para o escuro — só
+            aparece no celular, e corrigir exigiria mexer na tag por JS. */}
+        <meta name="theme-color" content={themeColor.light} />
         <link rel="icon" href="favicon.ico" type="image/x-icon" />
       </head>
       <body className={rubik.variable}>
+        {/* Migração das versões que ofereciam "seguir o sistema": sem isso o
+            valor antigo continuaria mandando, e quem estivesse com o SO no
+            escuro nunca veria o padrão claro. Roda antes do script do MUI
+            para não haver piscada, e pode sair quando ninguém mais tiver
+            esse valor guardado. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('mui-mode')==='system')localStorage.setItem('mui-mode','light')}catch(e){}",
+          }}
+        />
         {/* Aplica o esquema salvo antes da hidratação — sem isso a página
             pisca no tema claro antes de trocar para o escuro. */}
         {getInitColorSchemeScript()}

@@ -173,7 +173,11 @@ export const darkPalette = {
   },
 };
 
-/** Cor da barra do navegador por esquema, consumida pelo layout. */
+/**
+ * Cor da barra do navegador em cada esquema. O layout usa hoje só a clara,
+ * que é o padrão do app; a escura fica aqui para quando a tag acompanhar a
+ * troca manual.
+ */
 export const themeColor = {
   light: lightPalette.background.default,
   dark: darkPalette.background.default,
