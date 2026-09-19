@@ -11,9 +11,9 @@ import {
   Divider,
   Stack,
   Typography,
-  alpha,
 } from "@mui/material";
 import { useState } from "react";
+import { translucent } from "@/theme/translucent";
 
 const GENRES = Object.entries(GENRE_LABELS).map(([value, label]) => ({
   value,
@@ -50,8 +50,8 @@ const FilterBar = ({ filters, setFilters }: FilterBarProps) => {
       sx={{
         mb: { xs: 4, md: 6 },
         borderRadius: 2,
-        border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.03),
+        border: (theme) => `1px solid ${translucent(theme.vars.palette.primary.mainChannel, 0.2)}`,
+        backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.03),
       }}
     >
       <Stack
@@ -107,7 +107,7 @@ const FilterBar = ({ filters, setFilters }: FilterBarProps) => {
 
       <Collapse in={expanded} unmountOnExit>
         <Divider
-          sx={{ borderColor: (theme) => alpha(theme.palette.primary.main, 0.15) }}
+          sx={{ borderColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.15) }}
         />
         <Box
           display="flex"
@@ -128,12 +128,12 @@ const FilterBar = ({ filters, setFilters }: FilterBarProps) => {
                 sx={{
                   transition: ".2s",
                   border: (theme) =>
-                    `1px solid ${theme.palette.primary.main}`,
+                    `1px solid ${theme.vars.palette.primary.main}`,
                   ":hover": {
                     backgroundColor: (theme) =>
                       selected
-                        ? theme.palette.primary.dark
-                        : alpha(theme.palette.primary.main, 0.12),
+                        ? theme.vars.palette.primary.dark
+                        : translucent(theme.vars.palette.primary.mainChannel, 0.12),
                   },
                 }}
               />

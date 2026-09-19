@@ -19,6 +19,8 @@ const FRAME_STYLE = {
   aspectRatio: "16 / 9",
   borderRadius: 2,
   overflow: "hidden",
+  // Preto puro de propósito, fora do tema: é a tarja do vídeo, que deve
+  // ficar preta no claro e no escuro.
   backgroundColor: "#000",
 };
 

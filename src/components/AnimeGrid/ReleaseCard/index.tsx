@@ -8,6 +8,7 @@ import { airedDateLabel, timeAgoLabel } from "@/utils/anime";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import { Box, Paper, Stack, Typography, alpha } from "@mui/material";
 import { useEffect, useState } from "react";
+import { translucent } from "@/theme/translucent";
 
 /**
  * Card de "Episódios Recentes". Mostra o episódio, e não a obra: a imagem é a
@@ -56,8 +57,8 @@ const ReleaseCard = ({ anime }: { anime: AnimeProps }) => {
         height: "100%",
         borderRadius: 2,
         overflow: "hidden",
-        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04),
-        border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+        backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.04),
+        border: (theme) => `1px solid ${translucent(theme.vars.palette.primary.mainChannel, 0.15)}`,
         transition: ".2s",
         ":hover": {
           borderColor: "primary.main",
@@ -84,10 +85,10 @@ const ReleaseCard = ({ anime }: { anime: AnimeProps }) => {
             justifyContent: "center",
             opacity: 0,
             transition: ".2s",
-            backgroundColor: "rgba(14, 0, 15, 0.45)",
+            backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.45),
           }}
         >
-          <PlayArrowRoundedIcon sx={{ fontSize: "3rem", color: "#fff" }} />
+          <PlayArrowRoundedIcon sx={{ fontSize: "3rem", color: "common.white" }} />
         </Box>
 
         <AnimeScoreBadge score={anime.score} />
@@ -103,17 +104,18 @@ const ReleaseCard = ({ anime }: { anime: AnimeProps }) => {
             px: 1,
             py: 0.75,
             background:
-              "linear-gradient(180deg, transparent 0%, rgba(14,0,15,0.88) 100%)",
+              (theme) =>
+              `linear-gradient(180deg, transparent 0%, ${alpha(theme.palette.brand.scrim, 0.88)} 100%)`,
             pointerEvents: "none",
           }}
         >
           {!!numero && (
-            <Typography variant="caption" fontWeight={700} sx={{ color: "#fff" }}>
+            <Typography variant="caption" fontWeight={700} sx={{ color: "common.white" }}>
               EP {numero}
             </Typography>
           )}
           {!!anime.airedAt && (
-            <Typography variant="caption" sx={{ color: "#fff", opacity: 0.85 }}>
+            <Typography variant="caption" sx={{ color: "common.white", opacity: 0.85 }}>
               {timeAgoLabel(anime.airedAt)}
             </Typography>
           )}

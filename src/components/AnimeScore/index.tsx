@@ -1,12 +1,16 @@
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Box, Rating, Tooltip, Typography } from "@mui/material";
+import { Box, Rating, Tooltip, Typography, alpha } from "@mui/material";
 
-/** Faixas de cor para leitura rápida da nota (0 a 10). */
+/**
+ * Faixas de cor para leitura rápida da nota (0 a 10). Devolve o caminho do
+ * token no tema, e não um literal: o `sx` resolve `score.high` contra a
+ * paleta do esquema ativo, então a escala acompanha claro e escuro sozinha.
+ */
 export const scoreColor = (score: number) => {
-  if (score >= 8) return "#2e9e5b";
-  if (score >= 6.5) return "#e0a01e";
-  if (score >= 5) return "#d97706";
-  return "#c0392b";
+  if (score >= 8) return "score.high";
+  if (score >= 6.5) return "score.good";
+  if (score >= 5) return "score.mid";
+  return "score.low";
 };
 
 export const formatScore = (score: number) => score.toFixed(1).replace(".", ",");
@@ -28,7 +32,7 @@ export const AnimeScoreBadge = ({ score }: { score?: number | null }) => {
           px: 0.75,
           py: 0.25,
           borderRadius: 1,
-          backgroundColor: "rgba(14, 0, 15, 0.78)",
+          backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.78),
           backdropFilter: "blur(2px)",
         }}
       >
@@ -36,7 +40,7 @@ export const AnimeScoreBadge = ({ score }: { score?: number | null }) => {
         <Typography
           variant="caption"
           fontWeight={700}
-          sx={{ color: "#fff", lineHeight: 1 }}
+          sx={{ color: "common.white", lineHeight: 1 }}
         >
           {formatScore(score)}
         </Typography>

@@ -13,11 +13,11 @@ import {
   Paper,
   Stack,
   Typography,
-  alpha,
 } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { translucent } from "@/theme/translucent";
 
 /** Folga entre o cabeçalho fixo e o topo do aside. */
 const STICKY_GAP = 16;
@@ -65,12 +65,12 @@ const EpisodeListAside = ({
         },
         overflowY: "auto",
         borderRadius: 2,
-        border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+        border: (theme) => `1px solid ${translucent(theme.vars.palette.primary.mainChannel, 0.15)}`,
         p: 1,
         "&::-webkit-scrollbar": { width: 6 },
         "&::-webkit-scrollbar-thumb": {
           borderRadius: 3,
-          backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.3),
+          backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.3),
         },
       }}
     >
@@ -223,9 +223,9 @@ const SeasonShortcut = ({ season }: { season: FranchiseSeasonProps }) => (
       p: 1,
       borderRadius: 1.5,
       textDecoration: "none",
-      backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.05),
+      backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.05),
       ":hover": {
-        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.1),
+        backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.1),
       },
     }}
   >

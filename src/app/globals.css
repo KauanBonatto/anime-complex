@@ -8,9 +8,12 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  /* Mesmo roxo da navbar/footer: é a cor que aparece quando o scroll
-     ultrapassa o topo ou o fim da página. */
-  background-color: #3d0240;
+}
+
+/* Cor que aparece quando o scroll ultrapassa o topo ou o fim da página. O
+   CssBaseline já pinta o body; o html precisa da regra para o overscroll. */
+html {
+  background-color: var(--mui-palette-background-default);
 }
 
 a {

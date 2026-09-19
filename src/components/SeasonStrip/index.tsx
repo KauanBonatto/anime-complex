@@ -1,8 +1,9 @@
 "use client";
 
-import { Box, Paper, Stack, Typography, alpha } from "@mui/material";
+import { Box, Paper, Stack, Typography } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
+import { translucent } from "@/theme/translucent";
 
 /**
  * Temporadas da franquia. No AniList cada temporada é uma obra com ID próprio,
@@ -30,7 +31,7 @@ const SeasonStrip = ({ seasons }: { seasons: FranchiseSeasonProps[] }) => {
           "&::-webkit-scrollbar": { height: 6 },
           "&::-webkit-scrollbar-thumb": {
             borderRadius: 3,
-            backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.3),
+            backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.3),
           },
         }}
       >
@@ -52,13 +53,13 @@ const SeasonStrip = ({ seasons }: { seasons: FranchiseSeasonProps[] }) => {
               transition: ".2s",
               backgroundColor: (theme) =>
                 season.isCurrent
-                  ? alpha(theme.palette.primary.main, 0.12)
-                  : alpha(theme.palette.primary.main, 0.04),
+                  ? translucent(theme.vars.palette.primary.mainChannel, 0.12)
+                  : translucent(theme.vars.palette.primary.mainChannel, 0.04),
               border: (theme) =>
                 `1px solid ${
                   season.isCurrent
-                    ? theme.palette.primary.main
-                    : alpha(theme.palette.primary.main, 0.15)
+                    ? theme.vars.palette.primary.main
+                    : translucent(theme.vars.palette.primary.mainChannel, 0.15)
                 }`,
               ":hover": { borderColor: "primary.main" },
             }}

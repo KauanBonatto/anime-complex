@@ -8,7 +8,6 @@ import {
   IconButton,
   InputAdornment,
   TextField,
-  alpha,
 } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
@@ -16,6 +15,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import logoSvg from "../../assets/images/logo-white.svg";
 import { NAVBAR_HEIGHT } from "@/components/PageShell/height";
+import ColorModeToggle from "@/components/ColorModeToggle";
+import { translucent } from "@/theme/translucent";
 
 const NavbarComponent = () => {
   const pathname = usePathname();
@@ -56,10 +57,11 @@ const NavbarComponent = () => {
         flexDirection: "row",
         gap: { xs: 1, sm: 2 },
         paddingInline: { xs: 2, sm: 3, md: 5 },
-        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.92),
+        backgroundColor: (theme) =>
+          translucent(theme.vars.palette.brand.chromeChannel, 0.92),
         backdropFilter: "blur(8px)",
         borderBottom: (theme) =>
-          `1px solid ${alpha(theme.palette.common.white, 0.12)}`,
+          `1px solid ${translucent(theme.vars.palette.brand.chromeContrastChannel, 0.12)}`,
         "& .MuiButtonBase-root, & > a": { minHeight: 44 },
       }}
     >
@@ -103,26 +105,26 @@ const NavbarComponent = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: "common.white" }} />
+                  <SearchIcon fontSize="small" sx={{ color: "brand.chromeContrast" }} />
                 </InputAdornment>
               ),
             }}
             sx={{
               width: { sm: 190, md: 260 },
               "& .MuiOutlinedInput-root": {
-                color: "common.white",
+                color: "brand.chromeContrast",
                 borderRadius: 5,
                 backgroundColor: (theme) =>
-                  alpha(theme.palette.common.white, 0.12),
+                  translucent(theme.vars.palette.brand.chromeContrastChannel, 0.12),
                 transition: ".2s",
                 "& fieldset": { border: "none" },
                 "&:hover, &.Mui-focused": {
                   backgroundColor: (theme) =>
-                    alpha(theme.palette.common.white, 0.2),
+                    translucent(theme.vars.palette.brand.chromeContrastChannel, 0.2),
                 },
               },
               "& .MuiOutlinedInput-input::placeholder": {
-                color: "common.white",
+                color: "brand.chromeContrast",
                 opacity: 0.7,
               },
             }}
@@ -153,10 +155,15 @@ const NavbarComponent = () => {
           component={Link}
           href={searchHref}
           aria-label="Buscar"
-          sx={{ display: { xs: "inline-flex", sm: "none" } }}
+          sx={{
+            display: { xs: "inline-flex", sm: "none" },
+            color: "brand.chromeContrast",
+          }}
         >
-          <SearchIcon color="action" />
+          <SearchIcon />
         </IconButton>
+
+        <ColorModeToggle />
       </Box>
     </AppBar>
   );

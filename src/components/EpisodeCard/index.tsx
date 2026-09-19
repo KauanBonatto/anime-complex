@@ -3,6 +3,7 @@ import { durationLabel, episodeDateLabel } from "@/utils/anime";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import { Box, Paper, Stack, Typography, alpha } from "@mui/material";
 import Link from "next/link";
+import { translucent } from "@/theme/translucent";
 
 interface EpisodeCardProps {
   animeId: string;
@@ -39,13 +40,13 @@ const EpisodeCard = ({
           textDecoration: "none",
           transition: ".2s",
           backgroundColor: (theme) =>
-            isCurrent ? alpha(theme.palette.primary.main, 0.14) : "transparent",
+            isCurrent ? translucent(theme.vars.palette.primary.mainChannel, 0.14) : "transparent",
           border: (theme) =>
             `1px solid ${
-              isCurrent ? theme.palette.primary.main : "transparent"
+              isCurrent ? theme.vars.palette.primary.main : "transparent"
             }`,
           ":hover": {
-            backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+            backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.08),
           },
         }}
       >
@@ -92,12 +93,12 @@ const EpisodeCard = ({
         overflow: "hidden",
         textDecoration: "none",
         transition: ".2s",
-        backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.04),
+        backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.04),
         border: (theme) =>
           `1px solid ${
             isCurrent
-              ? theme.palette.primary.main
-              : alpha(theme.palette.primary.main, 0.15)
+              ? theme.vars.palette.primary.main
+              : translucent(theme.vars.palette.primary.mainChannel, 0.15)
           }`,
         ":hover": {
           borderColor: "primary.main",
@@ -124,10 +125,10 @@ const EpisodeCard = ({
             justifyContent: "center",
             opacity: 0,
             transition: ".2s",
-            backgroundColor: "rgba(14, 0, 15, 0.45)",
+            backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.45),
           }}
         >
-          <PlayArrowRoundedIcon sx={{ fontSize: "3rem", color: "#fff" }} />
+          <PlayArrowRoundedIcon sx={{ fontSize: "3rem", color: "common.white" }} />
         </Box>
 
         {/* Número e duração ficam sobre a imagem para o texto abaixo sobrar
@@ -143,17 +144,18 @@ const EpisodeCard = ({
             px: 1,
             py: 0.75,
             background:
-              "linear-gradient(180deg, transparent 0%, rgba(14,0,15,0.85) 100%)",
+              (theme) =>
+              `linear-gradient(180deg, transparent 0%, ${alpha(theme.palette.brand.scrim, 0.85)} 100%)`,
             pointerEvents: "none",
           }}
         >
-          <Typography variant="caption" fontWeight={700} sx={{ color: "#fff" }}>
+          <Typography variant="caption" fontWeight={700} sx={{ color: "common.white" }}>
             EP {episode.number}
           </Typography>
           {!!duration && (
             <Typography
               variant="caption"
-              sx={{ color: "#fff", opacity: 0.85 }}
+              sx={{ color: "common.white", opacity: 0.85 }}
             >
               {duration}
             </Typography>

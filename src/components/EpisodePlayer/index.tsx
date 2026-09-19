@@ -20,6 +20,8 @@ const PLAYER_STYLE = {
   maxHeight: "calc(100vh - 160px)",
   border: "none",
   borderRadius: 8,
+  // Preto puro de propósito, fora do tema: é a tarja do vídeo, que deve
+  // ficar preta no claro e no escuro.
   backgroundColor: "#000",
 };
 

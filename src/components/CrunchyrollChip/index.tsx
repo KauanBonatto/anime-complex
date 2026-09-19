@@ -1,9 +1,6 @@
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { Button, Tooltip } from "@mui/material";
 
-/** Laranja da marca, para o link se distinguir dos players do próprio site. */
-const CRUNCHYROLL_ORANGE = "#f47521";
-
 /**
  * Leva ao episódio na Crunchyroll, em uma aba nova. O `rel` é obrigatório com
  * `target="_blank"`: sem ele a página aberta ganha acesso a esta pela
@@ -24,12 +21,12 @@ const CrunchyrollChip = ({ link }: { link: CrunchyrollLinkProps }) => (
       rel="noopener noreferrer"
       endIcon={<OpenInNewIcon />}
       sx={{
-        color: CRUNCHYROLL_ORANGE,
-        borderColor: CRUNCHYROLL_ORANGE,
+        color: "brand.crunchyroll",
+        borderColor: "brand.crunchyroll",
         ":hover": {
           color: "common.white",
-          backgroundColor: CRUNCHYROLL_ORANGE,
-          borderColor: CRUNCHYROLL_ORANGE,
+          backgroundColor: "brand.crunchyroll",
+          borderColor: "brand.crunchyroll",
         },
       }}
     >

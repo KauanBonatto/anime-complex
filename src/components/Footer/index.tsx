@@ -18,20 +18,20 @@ const FooterComponent = () => {
           paddingInline: 5,
         }}
       >
-        <Typography color="text.secondary">
+        <Typography color="brand.chromeContrast">
           Catálogo e avaliações via{" "}
-          <Link href="https://anilist.co" style={{ color: `#2196f3` }}>
+          <Link href="https://anilist.co" style={{ color: theme.vars.palette.brand.link }}>
             AniList
           </Link>
           {" · "}Episódios via{" "}
           <Link
             href="https://github.com/yzPeedro/SugoiAPI"
-            style={{ color: `#2196f3` }}
+            style={{ color: theme.vars.palette.brand.link }}
           >
             SugoiAPI
           </Link>
           {" · "}Sinopses de mangá via{" "}
-          <Link href="https://mangadex.org" style={{ color: `#2196f3` }}>
+          <Link href="https://mangadex.org" style={{ color: theme.vars.palette.brand.link }}>
             MangaDex
           </Link>{" "}
           e seus grupos de tradução

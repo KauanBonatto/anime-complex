@@ -23,6 +23,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { translucent } from "@/theme/translucent";
 
 const HERO_HEIGHT = { xs: 320, sm: 380, md: 440 };
 
@@ -131,7 +132,7 @@ const HomeHero = ({ animes }: { animes: AnimeProps[] }) => {
         mb: { xs: 3, md: 5 },
         borderRadius: 2,
         overflow: "hidden",
-        backgroundColor: "primary.main",
+        backgroundColor: "brand.chrome",
       }}
       onMouseEnter={() => setPausado(true)}
       onMouseLeave={() => setPausado(false)}
@@ -255,9 +256,9 @@ const Slide = ({
           position: "absolute",
           inset: 0,
           background: (theme) => `linear-gradient(90deg,
-            ${theme.palette.primary.main} 0%,
-            ${theme.palette.primary.main}d9 45%,
-            ${theme.palette.primary.main}40 100%)`,
+            ${theme.vars.palette.brand.chrome} 0%,
+            ${translucent(theme.vars.palette.brand.chromeChannel, 0.85)} 45%,
+            ${translucent(theme.vars.palette.brand.chromeChannel, 0.25)} 100%)`,
         }}
       />
 
@@ -366,7 +367,7 @@ const Slide = ({
         {detalhes === undefined ? (
           <Skeleton
             variant="text"
-            sx={{ width: { xs: "90%", md: 520 }, bgcolor: "rgba(255,255,255,.2)" }}
+            sx={{ width: { xs: "90%", md: 520 }, bgcolor: (theme) => translucent(theme.vars.palette.brand.chromeContrastChannel, 0.2) }}
           />
         ) : (
           !!ficha?.description && (
@@ -394,8 +395,8 @@ const Slide = ({
           tabIndex={ativo ? 0 : -1}
           sx={{
             mt: 0.5,
-            backgroundColor: "common.white",
-            color: "primary.main",
+            backgroundColor: "brand.chromeContrast",
+            color: "brand.chrome",
             fontWeight: 600,
             ":hover": { backgroundColor: "grey.200" },
           }}

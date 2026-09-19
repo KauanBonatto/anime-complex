@@ -2,7 +2,7 @@ import { AnimeScoreBadge } from "@/components/AnimeScore";
 import ReleaseCard from "@/components/AnimeGrid/ReleaseCard";
 import { animeMetaLine } from "@/utils/anime";
 import { mangaMetaLine } from "@/utils/manga";
-import { Box, Chip, Paper, Typography } from "@mui/material";
+import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
 import Image from "next/image";
 
 interface AnimeCardProps {
@@ -56,8 +56,8 @@ const AnimeCard = ({
               height: 20,
               fontSize: "0.7rem",
               fontWeight: 700,
-              color: "#fff",
-              backgroundColor: "rgba(14, 0, 15, 0.78)",
+              color: "common.white",
+              backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.78),
             }}
           />
         )}

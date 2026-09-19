@@ -54,7 +54,7 @@ const EpisodeThumb = ({
         overflow: "hidden",
         backgroundColor: "primary.main",
         backgroundImage: (theme) =>
-          `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.dark} 100%)`,
+          `linear-gradient(135deg, ${theme.vars.palette.primary.light} 0%, ${theme.vars.palette.primary.dark} 100%)`,
       }}
     >
       {imagem ? (
