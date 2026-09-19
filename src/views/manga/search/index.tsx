@@ -1,8 +1,8 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
-import FilterBar from "@/components/FilterBar";
 import PageShell from "@/components/PageShell";
+import { useGenreFilters } from "@/contexts/GenreFilterContext";
 import MangaService from "@/services/MangaService";
 import { Box, TextField, Typography } from "@mui/material";
 import { useSearchParams } from "next/navigation";
@@ -17,7 +17,8 @@ const MangaSearchView = () => {
   const initialSearch = searchParams?.get("q")?.trim() ?? "";
 
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<string[]>([]);
+  // O filtro vive no cabeçalho; aqui a tela só consome a escolha.
+  const { filters } = useGenreFilters();
   const [search, setSearch] = useState<string>(initialSearch);
   const [debouncedSearch] = useDebounce(search, 500);
   const [searchedList, setSearchedList] = useState<ResponseApiProps | null>(
@@ -59,8 +60,6 @@ const MangaSearchView = () => {
           onChange={(event) => setSearch(event.target.value.trim())}
         />
       </Box>
-
-      <FilterBar filters={filters} setFilters={setFilters} />
 
       {hasSearch ? (
         <AnimeGrid

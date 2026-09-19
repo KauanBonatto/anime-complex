@@ -1,14 +1,15 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
-import FilterBar from "@/components/FilterBar";
 import PageShell from "@/components/PageShell";
+import { useGenreFilters } from "@/contexts/GenreFilterContext";
 import MangaService from "@/services/MangaService";
 import { Box, Typography } from "@mui/material";
 import { useCallback, useState } from "react";
 
 const MangaHomeView = () => {
-  const [filters, setFilters] = useState<string[]>([]);
+  // O filtro vive no cabeçalho; aqui a tela só consome a escolha.
+  const { filters } = useGenreFilters();
   const [popularLoading, setPopularLoading] = useState(true);
   const [topRatedLoading, setTopRatedLoading] = useState(true);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -62,7 +63,6 @@ const MangaHomeView = () => {
 
   return (
     <PageShell loading={popularLoading || topRatedLoading || recentLoading}>
-      <FilterBar filters={filters} setFilters={setFilters} />
       <Box
         sx={{ display: "flex", flexDirection: "column", gap: { xs: 8, md: 12 } }}
       >

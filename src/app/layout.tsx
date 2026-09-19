@@ -6,6 +6,7 @@ import { Rubik } from 'next/font/google';
 
 // Theme
 import ThemeRegistry from '@/theme/ThemeRegistry';
+import { GenreFilterProvider } from '@/contexts/GenreFilterContext';
 import { themeColor } from '@/theme';
 import { getInitColorSchemeScript } from '@mui/material/styles';
 
@@ -47,7 +48,11 @@ export default function RootLayout({
         {/* Aplica o esquema salvo antes da hidratação — sem isso a página
             pisca no tema claro antes de trocar para o escuro. */}
         {getInitColorSchemeScript()}
-        <ThemeRegistry>{children}</ThemeRegistry>
+        {/* O filtro de gênero fica no cabeçalho, que é irmão das telas: o
+            estado precisa nascer acima dos dois. */}
+        <ThemeRegistry>
+          <GenreFilterProvider>{children}</GenreFilterProvider>
+        </ThemeRegistry>
       </body>
     </html>
   );

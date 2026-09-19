@@ -1,9 +1,9 @@
 "use client";
 
 import AnimeGrid from "@/components/AnimeGrid";
-import FilterBar from "@/components/FilterBar";
 import HomeHero from "@/components/HomeHero";
 import PageShell from "@/components/PageShell";
+import { useGenreFilters } from "@/contexts/GenreFilterContext";
 import AnilistService from "@/services/AnilistService";
 import { pickHighlights } from "@/utils/anime";
 import { Box, Typography } from "@mui/material";
@@ -13,7 +13,8 @@ import { useCallback, useEffect, useState } from "react";
 const HIGHLIGHT_COUNT = 6;
 
 const HomeView = () => {
-  const [filters, setFilters] = useState<string[]>([]);
+  // O filtro vive no cabeçalho; aqui a tela só consome a escolha.
+  const { filters } = useGenreFilters();
   const [highlights, setHighlights] = useState<AnimeProps[]>([]);
   const [popularLoading, setPopularLoading] = useState(true);
   const [recentLoading, setRecentLoading] = useState(true);
@@ -78,8 +79,6 @@ const HomeView = () => {
   return (
     <PageShell loading={popularLoading || recentLoading}>
       <HomeHero animes={highlights} />
-
-      <FilterBar filters={filters} setFilters={setFilters} />
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 8, md: 12 } }}>
         <AnimeGrid

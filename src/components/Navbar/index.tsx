@@ -16,6 +16,7 @@ import { useState } from "react";
 import logoSvg from "../../assets/images/logo-white.svg";
 import { NAVBAR_HEIGHT } from "@/components/PageShell/height";
 import ColorModeToggle from "@/components/ColorModeToggle";
+import GenreMenu from "@/components/GenreMenu";
 import { translucent } from "@/theme/translucent";
 
 const NavbarComponent = () => {
@@ -31,6 +32,11 @@ const NavbarComponent = () => {
     { label: "Animes", href: "/animes", active: !isManga },
     { label: "Mangás", href: "/mangas", active: isManga },
   ];
+
+  // O filtro de gênero só faz sentido onde existe uma listagem para filtrar —
+  // na ficha da obra e no player ele não teria o que fazer.
+  const isFilterable = ["/animes", "/mangas", "/animes/search", "/mangas/search"]
+    .includes(pathname ?? "");
 
   /**
    * A busca em si mora na página de busca, que já debounce e pagina. A navbar
@@ -65,24 +71,32 @@ const NavbarComponent = () => {
         "& .MuiButtonBase-root, & > a": { minHeight: 44 },
       }}
     >
-      <Link href="/animes">
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            width: { xs: 110, sm: 150 },
-          }}
-        >
-          <Image
-            priority
-            width={150}
-            src={logoSvg}
-            draggable={false}
-            alt="Anime complex"
-            style={{ width: "100%", height: "auto" }}
-          />
-        </Box>
-      </Link>
+      <Box
+        display="flex"
+        alignItems="center"
+        sx={{ gap: { xs: 0.5, sm: 2 }, minWidth: 0 }}
+      >
+        <Link href="/animes">
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              width: { xs: 110, sm: 150 },
+            }}
+          >
+            <Image
+              priority
+              width={150}
+              src={logoSvg}
+              draggable={false}
+              alt="Anime complex"
+              style={{ width: "100%", height: "auto" }}
+            />
+          </Box>
+        </Link>
+
+        {isFilterable && <GenreMenu />}
+      </Box>
 
       <Box
         display="flex"
