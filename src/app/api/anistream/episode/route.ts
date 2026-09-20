@@ -5,6 +5,7 @@ import {
   anistreamConfig,
   encodeStreamSrc,
   jellyfinJson,
+  mediaBrowserAuth,
   resolveCredentials,
 } from "@/utils/anistream";
 
@@ -44,10 +45,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const config = anistreamConfig();
+
+  const url = new URL(request.url);
+  // Diagnóstico temporário: ?debug=1 reporta onde a resolução falha (sem vazar
+  // o token). Serve para descobrir, em produção, se a Vercel alcança o Jellyfin.
+  if (url.searchParams.get("debug")) {
+    return NextResponse.json(await runDebug(config));
+  }
+
   // Sem credenciais o provider fica desligado, sem estourar erro na tela.
   if (!config) return NextResponse.json({ providers: [] });
 
-  const url = new URL(request.url);
   const titles = url.searchParams.getAll("title").filter(Boolean);
   const episode = Number(url.searchParams.get("episode"));
   if (!titles.length || !Number.isFinite(episode) || episode < 1) {
@@ -64,6 +72,47 @@ export async function GET(request: Request) {
 
   return NextResponse.json(result);
 }
+
+/**
+ * Diagnóstico temporário (?debug=1). Reporta, sem expor o token, se as
+ * credenciais existem e — o principal — qual status a Vercel recebe do Jellyfin
+ * (app.anistream.biz). Um 200 confirma acesso; um 403/503 com corpo do
+ * Cloudflare denuncia bloqueio de IP; um 401 denuncia token revogado.
+ */
+const runDebug = async (
+  config: AnistreamConfig | null
+): Promise<Record<string, unknown>> => {
+  if (!config) {
+    return { configured: false, note: "nenhuma variável ANISTREAM_* setada" };
+  }
+
+  const creds = await resolveCredentials(config, REQUEST_TIMEOUT);
+  const out: Record<string, unknown> = {
+    configured: true,
+    mode: config.staticToken ? "token" : "mint",
+    hasCreds: !!creds,
+    userId: creds?.userId ? "present" : "missing",
+    jellyfinBase: config.jellyfinBase,
+  };
+  if (!creds) return out;
+
+  // Chamada crua ao Jellyfin, para ler o status verdadeiro (sem o retry que o
+  // authorizedFetch faz em 401). O corpo é espiado só o suficiente para
+  // reconhecer uma página de bloqueio do Cloudflare.
+  try {
+    const meUrl = new URL(config.jellyfinBase + "/Users/Me");
+    const res = await fetch(meUrl, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      headers: { Authorization: mediaBrowserAuth(creds.token, config.deviceId) },
+    });
+    const peek = (await res.text()).replace(/\s+/g, " ").slice(0, 120);
+    out.usersMe = { status: res.status, server: res.headers.get("server"), bodyPeek: peek };
+  } catch (err) {
+    out.usersMe = { error: String((err as Error)?.message).slice(0, 120) };
+  }
+  return out;
+};
 
 const resolveEpisode = async (
   config: AnistreamConfig,
