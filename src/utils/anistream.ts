@@ -1,26 +1,35 @@
 /**
  * Peças compartilhadas entre as rotas do AniStream: a configuração vinda do
- * ambiente, a autenticação que gera o token do Jellyfin sob demanda, um GET
- * autenticado com re-tentativa em 401, e a codificação do endereço de stream
- * que mantém o token fora do browser.
+ * ambiente, a obtenção do token do Jellyfin, um fetch autenticado com
+ * re-tentativa em 401, e a codificação do endereço de stream que mantém o
+ * token fora do browser.
  *
- * O AniStream é um Jellyfin cujo AccessToken é emitido pelo backend deles
- * (api.anistream.biz) a partir da senha do Jellyfin. Como esse token pode ser
- * revogado — a conta permite uma sessão ativa por vez —, aqui ele é obtido na
- * hora e renovado sozinho quando o Jellyfin responde 401.
+ * O AniStream é um Jellyfin. As chamadas de dados/vídeo vão ao Jellyfin
+ * (app.anistream.biz), que é estável. O que gera o token é o backend próprio
+ * deles (api.anistream.biz) — atrás de um Cloudflare que responde 502 para
+ * clientes de datacenter (Vercel), além de exigir um cookie de login que
+ * expira. Por isso o caminho preferido é um TOKEN JÁ PRONTO, guardado em env:
+ * ele fala direto com o Jellyfin, sem tocar no api.anistream.biz. O login sob
+ * demanda continua existindo como fallback, útil em ambiente residencial.
  */
+
+/** Identidade enviada ao Jellyfin no header Authorization (padrão do app). */
+const CLIENT = "Anistream";
+const CLIENT_VERSION = "1.8.8";
+const DEFAULT_DEVICE = "anime-complex";
 
 export interface AnistreamConfig {
   /** Jellyfin que serve os itens e o vídeo (app.anistream.biz). */
   jellyfinBase: string;
   /** Backend do AniStream que emite o token (api.anistream.biz). */
   apiBase: string;
-  /** Modo autenticado: gera o token na hora e o renova em 401. */
+  /** Identifica o dispositivo no header Authorization do Jellyfin. */
   deviceId?: string;
+  /** Fallback (só de IP residencial): gera o token via /authenticate. */
   password?: string;
-  /** Cookie de login do api.anistream.biz, se o /authenticate exigir. */
+  /** Cookie de login do api.anistream.biz, exigido pelo /authenticate. */
   session?: string;
-  /** Modo estático: token e usuário fixos, sem renovação. */
+  /** Caminho preferido: token e usuário já prontos, sem renovação automática. */
   staticToken?: string;
   staticUserId?: string;
 }
@@ -30,10 +39,20 @@ export interface AnistreamCredentials {
   userId: string;
 }
 
+/** Header Authorization do Jellyfin, no formato que o app do AniStream usa. */
+export const mediaBrowserAuth = (
+  token: string,
+  deviceId?: string
+): string =>
+  `MediaBrowser Client="${CLIENT}", Device="${CLIENT} Web", ` +
+  `DeviceId="${deviceId || DEFAULT_DEVICE}", Version="${CLIENT_VERSION}", ` +
+  `Token="${token}"`;
+
 /**
- * Lê a configuração do ambiente. Aceita dois modos: autenticado (deviceId +
- * password, que renova o token sozinho) ou estático (token + userId fixos).
- * Sem nenhum dos dois completo, o provider fica desligado.
+ * Lê a configuração do ambiente. Aceita dois modos, e o do token pronto tem
+ * prioridade: token + userId fixos (ANISTREAM_TOKEN/ANISTREAM_USER_ID) ou, como
+ * fallback, login sob demanda (deviceId + password + cookie). Sem nenhum dos
+ * dois completo, o provider fica desligado.
  */
 export const anistreamConfig = (): AnistreamConfig | null => {
   const jellyfinBase = (
@@ -46,12 +65,14 @@ export const anistreamConfig = (): AnistreamConfig | null => {
   const deviceId = process.env.ANISTREAM_DEVICE_ID || undefined;
   const password = process.env.ANISTREAM_PASSWORD || undefined;
   const session = process.env.ANISTREAM_SESSION || undefined;
-  const staticToken = process.env.ANISTREAM_API_KEY || undefined;
+  // ANISTREAM_TOKEN é o nome novo; ANISTREAM_API_KEY segue aceito por compat.
+  const staticToken =
+    process.env.ANISTREAM_TOKEN || process.env.ANISTREAM_API_KEY || undefined;
   const staticUserId = process.env.ANISTREAM_USER_ID || undefined;
 
-  const hasAuth = !!(deviceId && password);
   const hasStatic = !!(staticToken && staticUserId);
-  if (!hasAuth && !hasStatic) return null;
+  const hasAuth = !!(deviceId && password);
+  if (!hasStatic && !hasAuth) return null;
 
   return {
     jellyfinBase,
@@ -132,15 +153,25 @@ const authenticate = async (
 };
 
 /**
- * Devolve credenciais válidas. No modo autenticado usa o cache e só refaz o
- * login quando `refresh` pede (depois de um 401). No modo estático devolve o
- * token fixo do ambiente.
+ * Devolve credenciais válidas. O token pronto (env) tem prioridade e é o que
+ * funciona em produção, porque fala direto com o Jellyfin. Só quando ele falta,
+ * ou quando um 401 pede renovação (`refresh`), cai no login sob demanda — que
+ * só vinga de IP residencial.
  */
 export const resolveCredentials = async (
   config: AnistreamConfig,
   timeout: number,
   refresh = false
 ): Promise<AnistreamCredentials | null> => {
+  const staticCreds =
+    config.staticToken && config.staticUserId
+      ? { token: config.staticToken, userId: config.staticUserId }
+      : null;
+
+  // Caminho confiável: usa o token pronto sem nenhuma ida ao api.anistream.biz.
+  // No `refresh` a gente pula ele, porque foi justamente ele que tomou 401.
+  if (staticCreds && !refresh) return staticCreds;
+
   if (config.deviceId && config.password) {
     if (!refresh && tokenCache) return tokenCache;
 
@@ -149,14 +180,11 @@ export const resolveCredentials = async (
       tokenCache = fresh;
       return fresh;
     }
-    // A autenticação falhou (sessão vencida?). Cai no estático, se houver.
   }
 
-  if (config.staticToken && config.staticUserId) {
-    return { token: config.staticToken, userId: config.staticUserId };
-  }
-
-  return null;
+  // Sem renovar: melhor devolver o token pronto (mesmo que revogado) do que
+  // nada — quem chamou trata o 401. Some de vez só quando não há token algum.
+  return refresh ? null : staticCreds;
 };
 
 /** Corpo JSON opcional de uma chamada autenticada. */
@@ -185,7 +213,8 @@ export const authorizedFetch = async (
       cache: "no-store",
       signal: AbortSignal.timeout(timeout),
       headers: {
-        "X-Emby-Token": token,
+        // Header nativo do Jellyfin, como o app do AniStream envia.
+        Authorization: mediaBrowserAuth(token, config.deviceId),
         ...(init.json !== undefined
           ? { "Content-Type": "application/json", Accept: "application/json" }
           : {}),

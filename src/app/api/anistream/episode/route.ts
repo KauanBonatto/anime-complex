@@ -106,6 +106,18 @@ const normalize = (value: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+/**
+ * Termo enviado à busca do Jellyfin. O "×" (sinal de multiplicação, comum em
+ * títulos como "HUNTER×HUNTER") não retorna nada; viramos ele num "x", e ainda
+ * tiramos o "(ano)" do fim, que também atrapalha a busca.
+ */
+const searchTerm = (title: string) =>
+  title
+    .replace(/[×✕]/g, "x")
+    .replace(/\(\s*\d{4}\s*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 interface JellyfinItem {
   Id: string;
   Name?: string;
@@ -127,7 +139,9 @@ const findSeries = async (
     "/Items",
     {
       userId,
-      searchTerm: title,
+      // A busca do Jellyfin engasga com o "×" (ex.: "HUNTER×HUNTER" não
+      // retorna nada) e com o "(ano)" no fim; o termo limpo casa a série.
+      searchTerm: searchTerm(title),
       IncludeItemTypes: "Series",
       Recursive: "true",
       Limit: "8",
