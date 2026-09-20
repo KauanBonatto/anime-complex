@@ -153,6 +153,23 @@ interface EpisodeProviderProps {
   /** Player que não roda embutido aqui: vira link para uma aba nova. */
   isExternal?: boolean;
   url: string;
+  /**
+   * Faixas de legenda externas, ligadas como <track> no player. Só o AniStream
+   * entrega — a conta não pode queimar legenda no vídeo, então elas vêm à parte
+   * em WebVTT.
+   */
+  subtitles?: SubtitleTrackProps[];
+}
+
+/** Uma faixa de legenda externa (WebVTT) para o <track> do player. */
+interface SubtitleTrackProps {
+  url: string;
+  /** Código do idioma para o atributo srclang (ex.: "pt"). */
+  lang: string;
+  /** Rótulo exibido no menu de legendas (ex.: "Português"). */
+  label: string;
+  /** Verdadeiro na faixa que começa ligada. */
+  isDefault?: boolean;
 }
 
 interface AnimeRankingProps {

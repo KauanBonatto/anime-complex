@@ -7,15 +7,21 @@ import { CSSProperties, useEffect, useRef } from "react";
  * em cena. O caminho nativo do Safari fica como último recurso porque os
  * segmentos do Top Animes vêm disfarçados de PNG — o TS de verdade começa uns
  * bytes adiante, e só o hls.js procura o início real do stream.
+ *
+ * As legendas, quando o provider as entrega, vêm como faixas <track> externas
+ * (WebVTT). É assim que o AniStream serve legenda: a conta não pode queimá-la
+ * no vídeo, então ela é uma faixa à parte, renderizada pelo próprio <video>.
  */
 const HlsVideo = ({
   src,
   style,
   onError,
+  subtitles,
 }: {
   src: string;
   style?: CSSProperties;
   onError: () => void;
+  subtitles?: SubtitleTrackProps[];
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -59,7 +65,43 @@ const HlsVideo = ({
     };
   }, [src]);
 
-  return <video ref={videoRef} controls autoPlay style={style} />;
+  /**
+   * O atributo `default` do <track> nem sempre basta para o browser já mostrar
+   * a legenda, então forçamos o modo assim que as faixas existem. A escolhida é
+   * a marcada como padrão (Português); as outras ficam disponíveis no menu.
+   */
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !subtitles?.length) return;
+
+    const defaultLabel = subtitles.find((track) => track.isDefault)?.label;
+
+    const applyMode = () => {
+      const tracks = video.textTracks;
+      for (let i = 0; i < tracks.length; i++) {
+        tracks[i].mode = tracks[i].label === defaultLabel ? "showing" : "disabled";
+      }
+    };
+
+    applyMode();
+    video.addEventListener("loadedmetadata", applyMode);
+    return () => video.removeEventListener("loadedmetadata", applyMode);
+  }, [subtitles]);
+
+  return (
+    <video ref={videoRef} controls autoPlay style={style}>
+      {subtitles?.map((track) => (
+        <track
+          key={track.url}
+          kind="subtitles"
+          src={track.url}
+          srcLang={track.lang}
+          label={track.label}
+          default={track.isDefault}
+        />
+      ))}
+    </video>
+  );
 };
 
 export default HlsVideo;

@@ -91,6 +91,7 @@ const EpisodePlayer = ({
         <HlsVideo
           key={selectedProvider.url}
           src={selectedProvider.url}
+          subtitles={selectedProvider.subtitles}
           style={PLAYER_STYLE}
           onError={() => setPlayerFailed(true)}
         />

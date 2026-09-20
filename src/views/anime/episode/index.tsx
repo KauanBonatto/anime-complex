@@ -6,6 +6,7 @@ import EpisodePlayer from "@/components/EpisodePlayer";
 import PageShell from "@/components/PageShell";
 import { useFranchiseSeasons } from "@/hooks/useFranchiseSeasons";
 import AnilistService from "@/services/AnilistService";
+import AnistreamService from "@/services/AnistreamService";
 import SugoiService from "@/services/SugoiService";
 import TmdbService from "@/services/TmdbService";
 import { crunchyrollEpisodeLink, episodeDateLabel } from "@/utils/anime";
@@ -83,9 +84,16 @@ const AnimeEpisodeView = ({
       setLocalized(true);
     });
 
-    const episodeProviders = sortProviders(
-      await SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),
-    );
+    // O AniStream (biblioteca própria, HLS sem anúncios) roda em paralelo ao
+    // Sugoi; um não segura o outro, e a falta de credenciais só devolve vazio.
+    const [sugoiProviders, anistreamProviders] = await Promise.all([
+      SugoiService.getEpisodeProviders(animeDetailsData, episodeNumber),
+      AnistreamService.getEpisodeProviders(animeDetailsData, episodeNumber),
+    ]);
+    const episodeProviders = sortProviders([
+      ...anistreamProviders,
+      ...sugoiProviders,
+    ]);
     setProviders(episodeProviders);
     // Os que só abrem em aba nova ficam de fora: eles não têm o que tocar aqui.
     setSelectedProvider(
