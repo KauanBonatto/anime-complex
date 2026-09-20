@@ -93,6 +93,17 @@ export const anistreamConfig = (): AnistreamConfig | null => {
 let tokenCache: AnistreamCredentials | null = null;
 
 /**
+ * Momento da última falha de login. Quando o mint falha (backend deles em pico,
+ * 502/429), esperamos este intervalo antes de tentar de novo — senão, com o
+ * token revogado, cada requisição martela o login justo quando ele já sofre.
+ */
+let mintFailedAt: number | null = null;
+const MINT_COOLDOWN = 30_000;
+
+const canMint = () =>
+  mintFailedAt === null || Date.now() - mintFailedAt >= MINT_COOLDOWN;
+
+/**
  * Nº de tentativas de login. O backend do AniStream oscila para 502 por
  * instantes e volta sozinho, então uma falha de gateway não pode derrubar o
  * provider — repetimos algumas vezes, com uma pausa curta entre elas.
@@ -175,10 +186,15 @@ export const resolveCredentials = async (
   if (config.deviceId && config.password) {
     if (!refresh && tokenCache) return tokenCache;
 
-    const fresh = await authenticate(config, timeout);
-    if (fresh) {
-      tokenCache = fresh;
-      return fresh;
+    // Depois de uma falha recente de login, segura um pouco antes de insistir.
+    if (canMint()) {
+      const fresh = await authenticate(config, timeout);
+      if (fresh) {
+        tokenCache = fresh;
+        mintFailedAt = null;
+        return fresh;
+      }
+      mintFailedAt = Date.now();
     }
   }
 
