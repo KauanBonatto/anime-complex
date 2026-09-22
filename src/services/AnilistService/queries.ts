@@ -59,6 +59,27 @@ export const RECENT_EPISODES_QUERY = `
   }
 `;
 
+/**
+ * Grade dos próximos lançamentos. A janela é limitada nas duas pontas: o
+ * `airingAt_greater` descarta o que já foi ao ar e o `airingAt_lesser` evita
+ * arrastar agendamentos de meses à frente, que o calendário da home não mostra.
+ */
+export const UPCOMING_EPISODES_QUERY = `
+  query UpcomingEpisodes($page: Int, $perPage: Int, $from: Int, $until: Int) {
+    Page(page: $page, perPage: $perPage) {
+      ${PAGE_INFO}
+      airingSchedules(airingAt_greater: $from, airingAt_lesser: $until, sort: [TIME]) {
+        episode
+        airingAt
+        media {
+          ${ANIME_FIELDS}
+          isAdult
+        }
+      }
+    }
+  }
+`;
+
 export const RECENT_ANIME_QUERY = `
   query RecentAnime($page: Int, $perPage: Int, $genres: [String]) {
     Page(page: $page, perPage: $perPage) {

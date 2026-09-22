@@ -136,6 +136,36 @@ interface CrunchyrollLinkProps {
   isEpisode: boolean;
 }
 
+/**
+ * Um episódio que ainda vai ao ar, no calendário de lançamentos da home.
+ *
+ * Não reaproveita `AnimeProps` de propósito: ali o episódio é um acessório da
+ * obra, e aqui a linha é o episódio — a obra entra só como título e capa.
+ */
+interface UpcomingEpisodeProps {
+  /** Id da obra no AniList; o card leva para a ficha dela. */
+  id: string;
+  title: string;
+  image: string;
+  episodeNumber: number;
+  /** Horário do lançamento, em segundos (epoch). */
+  airingAt: number;
+  /** Gêneros da obra, para o calendário respeitar o filtro do cabeçalho. */
+  genres: string[];
+  /** Define quem entra no calendário e a ordem dentro de cada dia. */
+  popularity: number | null;
+  format: string | null;
+}
+
+/** Um dia do calendário de lançamentos, no fuso de quem está olhando. */
+interface UpcomingDayProps {
+  /** Chave do dia local, só para diferenciar os grupos na renderização. */
+  key: string;
+  /** "Hoje", "Amanhã" ou "sex., 26 de set.". */
+  label: string;
+  episodes: UpcomingEpisodeProps[];
+}
+
 /** Próximo episódio agendado, com o horário em segundos (epoch). */
 interface NextEpisodeProps {
   number: number;

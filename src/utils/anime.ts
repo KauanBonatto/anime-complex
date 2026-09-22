@@ -142,6 +142,86 @@ export const airingDateLabel = (airingAt: number) => {
   return `${day} às ${hour}`;
 };
 
+/** "19:00" — só a hora do lançamento, no fuso do usuário. */
+export const airingTimeLabel = (airingAt: number) =>
+  new Date(airingAt * 1000).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+/** Identifica o dia local de uma data — é por ele que o calendário agrupa. */
+const localDayKey = (date: Date) =>
+  `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+
+/**
+ * Cabeçalho de um dia do calendário: "Hoje", "Amanhã" ou "sex., 26 de set.".
+ *
+ * Os dois primeiros existem porque é neles que está quase toda a atenção de
+ * quem abre a home — e um dia da semana solto obrigaria a conferir o calendário
+ * do sistema para saber se já é hoje.
+ */
+export const upcomingDayLabel = (airingAt: number, reference = new Date()) => {
+  const date = new Date(airingAt * 1000);
+
+  const tomorrow = new Date(reference);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (localDayKey(date) === localDayKey(reference)) return "Hoje";
+  if (localDayKey(date) === localDayKey(tomorrow)) return "Amanhã";
+
+  return date.toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+};
+
+/**
+ * Monta o calendário: um grupo por dia, do mais próximo ao mais distante, e
+ * dentro de cada dia as obras mais populares na frente.
+ *
+ * A ordem é dividida assim de propósito. Ordenar a faixa inteira por
+ * popularidade jogaria o lançamento de daqui a uma hora para o fim da lista; só
+ * por horário, o dia seria aberto por séries que quase ninguém acompanha. O
+ * agrupamento por dia é o que deixa os dois critérios conviverem.
+ *
+ * O dia é o dia de quem está olhando: um episódio que sai 01:00 no Japão cai em
+ * dias diferentes conforme o fuso, e é por isso que o agrupamento não vem
+ * pronto do serviço.
+ */
+export const groupUpcomingByDay = (
+  episodes: UpcomingEpisodeProps[]
+): UpcomingDayProps[] => {
+  const days: UpcomingDayProps[] = [];
+  const byKey = new Map<string, UpcomingDayProps>();
+
+  for (const episode of [...episodes].sort((a, b) => a.airingAt - b.airingAt)) {
+    const key = localDayKey(new Date(episode.airingAt * 1000));
+    const day = byKey.get(key);
+
+    if (day) {
+      day.episodes.push(episode);
+      continue;
+    }
+
+    // A lista já vem em ordem cronológica, então a ordem em que os dias
+    // aparecem pela primeira vez é a ordem do calendário.
+    const novo: UpcomingDayProps = {
+      key,
+      label: upcomingDayLabel(episode.airingAt),
+      episodes: [episode],
+    };
+    byKey.set(key, novo);
+    days.push(novo);
+  }
+
+  for (const day of days) {
+    day.episodes.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+  }
+
+  return days;
+};
+
 /** Embaralhamento de Fisher-Yates, sobre uma cópia. */
 const shuffle = <T,>(items: T[]): T[] => {
   const copy = [...items];

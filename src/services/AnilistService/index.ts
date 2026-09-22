@@ -5,6 +5,7 @@ import {
   RECENT_ANIME_QUERY,
   RECENT_EPISODES_QUERY,
   SEARCH_ANIME_QUERY,
+  UPCOMING_EPISODES_QUERY,
 } from "./queries";
 import { AnilistMedia, AnilistPage } from "./types";
 import {
@@ -26,6 +27,22 @@ const PER_PAGE = 24;
  */
 const AIRING_WINDOW_PAGE_SIZE = 50;
 const AIRING_WINDOW_PAGES = 3;
+
+/**
+ * Janela do calendário de lançamentos: uma semana à frente. Além disso a grade
+ * do AniList fica rarefeita — só as obras cujo estúdio já anunciou a temporada
+ * inteira — e o calendário viraria uma lista de poucas séries repetidas.
+ */
+const UPCOMING_WINDOW_DAYS = 7;
+const UPCOMING_PAGE_SIZE = 50;
+const UPCOMING_PAGES = 3;
+
+/**
+ * Quantas obras o calendário carrega. A semana inteira passa de cem episódios,
+ * a maioria de séries que ninguém acompanha; o corte é pela popularidade, e a
+ * faixa ainda fica longa o bastante para uma rolagem de verdade.
+ */
+const UPCOMING_LIMIT = 30;
 
 /**
  * Catálogo e fichas mudam devagar — uma temporada nova por trimestre, notas
@@ -62,6 +79,15 @@ const airingWindowCache = createCache<AnimeProps[]>({
 });
 
 const AIRING_WINDOW_KEY = "current";
+
+/** Mesma ideia da janela de recentes: lista grande, só em memória. */
+const upcomingWindowCache = createCache<UpcomingEpisodeProps[]>({
+  namespace: "anilist:upcoming-window",
+  ttl: LIST_TTL,
+  maxEntries: 1,
+});
+
+const UPCOMING_WINDOW_KEY = "current";
 
 /**
  * Temporadas de uma franquia. Montar a lista custa uma requisição por elo, e o
@@ -169,6 +195,97 @@ class AnilistServiceClass {
       }));
 
     return this.sortByPopularity(this.dedupe(results));
+  }
+
+  /**
+   * Calendário dos próximos episódios: o que ainda vai ao ar na semana, uma
+   * entrada por obra.
+   *
+   * A grade de exibição do AniList não aceita filtro de gênero, então a janela
+   * inteira é buscada uma vez e o filtro é aplicado aqui — antes do corte por
+   * popularidade, para que um gênero de nicho use as trinta vagas com obras
+   * daquele gênero, e não com o que sobrou das mais populares da semana.
+   *
+   * A ordem final é montada na tela, que agrupa por dia no fuso de quem olha;
+   * aqui a lista sai em ordem cronológica.
+   */
+  async getUpcomingEpisodes(
+    genres: string[] = []
+  ): Promise<UpcomingEpisodeProps[]> {
+    const window = await upcomingWindowCache.resolve(
+      UPCOMING_WINDOW_KEY,
+      () => this.fetchUpcomingEpisodes(),
+      { shouldStore: (episodes) => episodes.length > 0 }
+    );
+
+    // A janela vale por uma hora, e nesse intervalo os primeiros episódios da
+    // lista já podem ter ido ao ar — o calendário só mostra o que ainda vem.
+    const now = Math.floor(Date.now() / 1000);
+
+    const upcoming = window.filter(
+      (episode) =>
+        episode.airingAt > now &&
+        // Basta um dos gêneros escolhidos, como na grade de gêneros do AniList.
+        (!genres.length ||
+          genres.some((genre) => episode.genres.includes(genre)))
+    );
+
+    // A popularidade decide quem entra; a ordem de exibição é cronológica.
+    return [...upcoming]
+      .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+      .slice(0, UPCOMING_LIMIT)
+      .sort((a, b) => a.airingAt - b.airingAt);
+  }
+
+  private async fetchUpcomingEpisodes(): Promise<UpcomingEpisodeProps[]> {
+    const from = Math.floor(Date.now() / 1000);
+    const until = from + UPCOMING_WINDOW_DAYS * 24 * 60 * 60;
+
+    const pages = await Promise.all(
+      Array.from({ length: UPCOMING_PAGES }, (_, index) =>
+        this.request<{ Page: AnilistPage }>(UPCOMING_EPISODES_QUERY, {
+          page: index + 1,
+          perPage: UPCOMING_PAGE_SIZE,
+          from,
+          until,
+        })
+      )
+    );
+
+    const seen = new Set<string>();
+    const episodes: UpcomingEpisodeProps[] = [];
+
+    for (const schedule of pages.flatMap(
+      (data) => data?.Page?.airingSchedules ?? []
+    )) {
+      const media = schedule.media;
+      if (!media || media.isAdult) continue;
+
+      const id = String(media.id);
+      // A consulta vem em ordem cronológica, então o primeiro agendamento de
+      // uma obra é justamente o próximo episódio dela. Os seguintes são a
+      // semana inteira da mesma série, e ocupariam a vaga de outras obras.
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      episodes.push({
+        id,
+        title: media.title?.romaji ?? media.title?.english ?? "Sem título",
+        image:
+          media.coverImage?.extraLarge ??
+          media.coverImage?.large ??
+          DEFAULT_COVER,
+        episodeNumber: schedule.episode,
+        airingAt: schedule.airingAt,
+        genres: media.genres ?? [],
+        popularity: media.popularity ?? null,
+        format: media.format ?? null,
+      });
+    }
+
+    // A janela guardada é a semana inteira, em ordem cronológica: o corte por
+    // popularidade depende do filtro de gêneros e é refeito a cada chamada.
+    return episodes;
   }
 
   async getAnimeBySearch(
