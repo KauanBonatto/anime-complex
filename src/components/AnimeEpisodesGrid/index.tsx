@@ -2,7 +2,8 @@
 
 import EpisodeCard from "@/components/EpisodeCard";
 import { useEpisodeCatalog } from "@/hooks/useEpisodeCatalog";
-import { Box, Button, TextField, Typography, useTheme } from "@mui/material";
+import { Box, Button, TextField, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { useMemo, useState } from "react";
 
 /**

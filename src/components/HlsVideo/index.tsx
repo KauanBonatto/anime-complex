@@ -1,6 +1,7 @@
 "use client";
 
-import { CSSProperties, useEffect, useRef } from "react";
+import { CircularProgress } from "@mui/material";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 
 /**
  * Toca uma playlist HLS pelo hls.js, baixado só quando um player desses entra
@@ -24,6 +25,13 @@ const HlsVideo = ({
   subtitles?: SubtitleTrackProps[];
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  /**
+   * Entre o clique e o primeiro quadro há o download do hls.js, a playlist e o
+   * primeiro segmento — vários segundos numa conexão ruim, e o que se via era
+   * uma tarja preta parada, indistinguível de um player quebrado. A roda some
+   * no primeiro quadro e volta se o vídeo travar para encher o buffer.
+   */
+  const [aguardando, setAguardando] = useState(true);
 
   // Guardado em ref para o player não ser remontado a cada render do pai.
   const onErrorRef = useRef(onError);
@@ -79,7 +87,8 @@ const HlsVideo = ({
     const applyMode = () => {
       const tracks = video.textTracks;
       for (let i = 0; i < tracks.length; i++) {
-        tracks[i].mode = tracks[i].label === defaultLabel ? "showing" : "disabled";
+        tracks[i].mode =
+          tracks[i].label === defaultLabel ? "showing" : "disabled";
       }
     };
 
@@ -89,18 +98,44 @@ const HlsVideo = ({
   }, [subtitles]);
 
   return (
-    <video ref={videoRef} controls autoPlay style={style}>
-      {subtitles?.map((track) => (
-        <track
-          key={track.url}
-          kind="subtitles"
-          src={track.url}
-          srcLang={track.lang}
-          label={track.label}
-          default={track.isDefault}
+    <div style={{ position: "relative", ...style, backgroundColor: undefined }}>
+      {aguardando && (
+        <CircularProgress
+          size={44}
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            marginTop: "-22px",
+            marginLeft: "-22px",
+            color: "common.white",
+            // Acima do vídeo, mas sem roubar o clique dos controles nativos.
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
         />
-      ))}
-    </video>
+      )}
+      <video
+        ref={videoRef}
+        controls
+        autoPlay
+        style={{ ...style, display: "block" }}
+        onWaiting={() => setAguardando(true)}
+        onPlaying={() => setAguardando(false)}
+        onCanPlay={() => setAguardando(false)}
+      >
+        {subtitles?.map((track) => (
+          <track
+            key={track.url}
+            kind="subtitles"
+            src={track.url}
+            srcLang={track.lang}
+            label={track.label}
+            default={track.isDefault}
+          />
+        ))}
+      </video>
+    </div>
   );
 };
 

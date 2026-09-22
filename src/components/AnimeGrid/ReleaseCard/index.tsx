@@ -6,7 +6,8 @@ import { useInView } from "@/hooks/useInView";
 import TmdbService from "@/services/TmdbService";
 import { airedDateLabel, timeAgoLabel } from "@/utils/anime";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
-import { Box, Paper, Stack, Typography, alpha } from "@mui/material";
+import { Box, Paper, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { useEffect, useState } from "react";
 import { translucent } from "@/theme/translucent";
 
@@ -59,7 +60,7 @@ const ReleaseCard = ({ anime }: { anime: AnimeProps }) => {
         overflow: "hidden",
         backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.04),
         border: (theme) => `1px solid ${translucent(theme.vars.palette.primary.mainChannel, 0.15)}`,
-        transition: ".2s",
+        transition: "border-color .2s ease",
         ":hover": {
           borderColor: "primary.main",
           ".episode-thumb": { transform: "scale(1.05)" },
@@ -84,7 +85,7 @@ const ReleaseCard = ({ anime }: { anime: AnimeProps }) => {
             alignItems: "center",
             justifyContent: "center",
             opacity: 0,
-            transition: ".2s",
+            transition: "opacity .2s ease",
             backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.45),
           }}
         >

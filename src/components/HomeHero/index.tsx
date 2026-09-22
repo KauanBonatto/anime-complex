@@ -8,18 +8,9 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import {
-  Box,
-  Button,
-  Chip,
-  IconButton,
-  Skeleton,
-  Stack,
-  Typography,
-  alpha,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
+import { Box, Button, Chip, IconButton, Skeleton, Stack, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -182,7 +173,7 @@ const HomeHero = ({ animes }: { animes: AnimeProps[] }) => {
                   border: "none",
                   borderRadius: 4,
                   cursor: "pointer",
-                  transition: ".25s",
+                  transition: "width .25s ease, background-color .25s ease",
                   backgroundColor: (t) =>
                     posicao === index
                       ? t.palette.common.white

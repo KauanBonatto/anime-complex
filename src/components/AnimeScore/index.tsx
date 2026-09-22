@@ -1,5 +1,6 @@
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Box, Rating, Tooltip, Typography, alpha } from "@mui/material";
+import { Box, Rating, Tooltip, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 /**
  * Faixas de cor para leitura rápida da nota (0 a 10). Devolve o caminho do
@@ -32,8 +33,12 @@ export const AnimeScoreBadge = ({ score }: { score?: number | null }) => {
           px: 0.75,
           py: 0.25,
           borderRadius: 1,
-          backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.78),
-          backdropFilter: "blur(2px)",
+          // Sem `backdrop-filter`: este selo aparece uma vez por card, e uma
+          // grade tem vinte e poucos deles — eram vinte camadas de desfoque
+          // independentes para o compositor refazer a cada quadro de rolagem.
+          // A 88% de opacidade o fundo já cumpre o mesmo papel de contraste
+          // por cima de qualquer capa, de graça.
+          backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.88),
         }}
       >
         <StarRoundedIcon sx={{ fontSize: "1rem", color: scoreColor(score) }} />

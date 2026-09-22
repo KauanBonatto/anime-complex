@@ -1,6 +1,7 @@
 "use client";
 
-import { AppBar, Box, Typography, useTheme } from "@mui/material";
+import { AppBar, Box, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import Link from "next/link";
 
 const FooterComponent = () => {

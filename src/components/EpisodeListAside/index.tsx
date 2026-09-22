@@ -2,6 +2,8 @@
 
 import EpisodeCard from "@/components/EpisodeCard";
 import { useEpisodeCatalog } from "@/hooks/useEpisodeCatalog";
+import { usePrefetchOnHover } from "@/hooks/usePrefetchOnHover";
+import AnilistService from "@/services/AnilistService";
 import { NAVBAR_HEIGHT } from "@/components/PageShell/height";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
@@ -14,13 +16,21 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import Image from "next/image";
+import FadingImage from "@/components/FadingImage";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { translucent } from "@/theme/translucent";
 
 /** Folga entre o cabeçalho fixo e o topo do aside. */
 const STICKY_GAP = 16;
+
+/**
+ * Altura aproximada de uma linha da lista: a miniatura de 96px em 16:9 (54px)
+ * mais o respiro e a borda. Serve de palpite para o espaço reservado aos
+ * episódios que ainda não foram pintados — não precisa ser exata, só próxima,
+ * senão a barra de rolagem se ajusta demais durante a rolagem.
+ */
+const EPISODE_ROW_HEIGHT = 68;
 
 interface EpisodeListAsideProps {
   anime: AnimeDetailsProps;
@@ -183,7 +193,22 @@ const EpisodeList = ({
         const isCurrent = number === currentEpisode;
 
         return (
-          <Box key={number} ref={isCurrent ? currentRef : undefined}>
+          <Box
+            key={number}
+            ref={isCurrent ? currentRef : undefined}
+            sx={{
+              // Uma obra longa põe mais de mil episódios nesta lista, e o
+              // navegador media e pintava todos — inclusive os que ficam a
+              // milhares de pixels fora da área visível. Com isto ele pula o
+              // trabalho de quem está fora e o refaz ao chegar perto; a altura
+              // declarada segura o lugar para a barra de rolagem não mudar de
+              // tamanho enquanto se rola. O `scrollIntoView` do episódio atual
+              // continua funcionando: o navegador renderiza o alvo ao pular
+              // para ele.
+              contentVisibility: "auto",
+              containIntrinsicSize: `auto ${EPISODE_ROW_HEIGHT}px`,
+            }}
+          >
             <EpisodeCard
               compact
               animeId={anime.id}
@@ -212,6 +237,7 @@ const SeasonShortcut = ({ season }: { season: FranchiseSeasonProps }) => (
     component={Link}
     href={`/anime/${season.id}`}
     elevation={0}
+    {...usePrefetchOnHover(() => AnilistService.getAnimeDetails(season.id))}
     sx={{
       display: "flex",
       alignItems: "center",
@@ -236,7 +262,7 @@ const SeasonShortcut = ({ season }: { season: FranchiseSeasonProps }) => (
           overflow: "hidden",
         }}
       >
-        <Image
+        <FadingImage
           src={season.cover}
           alt=""
           aria-hidden

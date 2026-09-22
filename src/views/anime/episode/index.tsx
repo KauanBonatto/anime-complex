@@ -12,16 +12,9 @@ import TmdbService from "@/services/TmdbService";
 import { crunchyrollEpisodeLink, episodeDateLabel } from "@/utils/anime";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
-import {
-  Box,
-  Button,
-  Grid,
-  Skeleton,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Grid, Skeleton, Stack, Typography } from "@mui/material";
 import { notFound, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
 /**
  * Prioriza quem toca aqui dentro, depois os players sem anúncios e, entre eles,
@@ -45,6 +38,13 @@ const AnimeEpisodeView = ({
   params: { anime_id: string; episode_id: string };
 }) => {
   const router = useRouter();
+  /**
+   * Os botões de episódio são botões, e não links, então não têm o retorno
+   * visual que o navegador dá a um link clicado — e a troca de episódio leva
+   * um tempo. `isPending` cobre esse vão: o botão fica desabilitado e a barra
+   * de progresso do topo sobe assim que o clique acontece.
+   */
+  const [navegando, iniciarNavegacao] = useTransition();
   const animeId = params.anime_id;
   const episodeNumber = Number(params.episode_id);
 
@@ -109,7 +109,7 @@ const AnimeEpisodeView = ({
   if (invalidEpisode) notFound();
 
   const goToEpisode = (nextEpisode: number) =>
-    router.push(`/anime/${animeId}/${nextEpisode}`);
+    iniciarNavegacao(() => router.push(`/anime/${animeId}/${nextEpisode}`));
 
   const hasNextEpisode =
     !!animeDetails && episodeNumber < animeDetails.availableEpisodes;
@@ -122,7 +122,7 @@ const AnimeEpisodeView = ({
   const episode = animeDetails?.episodes?.[episodeNumber];
 
   return (
-    <PageShell loading={loading}>
+    <PageShell loading={loading || navegando}>
       <Grid container spacing={4}>
         <Grid item xs={12} lg={8}>
           <Box mb={3}>
@@ -171,7 +171,7 @@ const AnimeEpisodeView = ({
             <Button
               variant="outlined"
               startIcon={<ArrowBackIosNewIcon />}
-              disabled={episodeNumber <= 1}
+              disabled={navegando || episodeNumber <= 1}
               onClick={() => goToEpisode(episodeNumber - 1)}
             >
               Episódio anterior
@@ -179,7 +179,7 @@ const AnimeEpisodeView = ({
             <Button
               variant="outlined"
               endIcon={<ArrowForwardIosIcon />}
-              disabled={!hasNextEpisode}
+              disabled={navegando || !hasNextEpisode}
               onClick={() => goToEpisode(episodeNumber + 1)}
             >
               Próximo episódio

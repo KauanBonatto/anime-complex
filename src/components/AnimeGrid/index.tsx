@@ -1,6 +1,9 @@
-import { Box, Button, Skeleton, Typography, useTheme } from "@mui/material";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import PrefetchLink from "@/components/PrefetchLink";
+import AnilistService from "@/services/AnilistService";
+import MangaService from "@/services/MangaService";
+import { Box, Button, Skeleton, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { useEffect, useRef, useState } from "react";
 import AnimeCard from "./AnimeCard";
 
 const SKELETON_PLACEHOLDERS = Array.from({ length: 12 });
@@ -18,6 +21,14 @@ const AnimeGrid = ({
   const theme = useTheme();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [currentToken, setCurrentToken] = useState(resetToken);
+  const topRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Trocar de página com o dedo no botão deixa o usuário no rodapé da grade,
+   * olhando para o fim de uma lista que acabou de ser substituída. Só rolamos
+   * quando foi ele quem pediu a troca — na primeira carga a página deve ficar
+   * onde está.
+   */
+  const pediuTroca = useRef(false);
 
   // Ao trocar os filtros voltamos para a primeira página antes do fetch.
   if (resetToken !== currentToken) {
@@ -25,23 +36,45 @@ const AnimeGrid = ({
     setPageNumber(1);
   }
 
+  const irParaPagina = (proxima: number) => {
+    pediuTroca.current = true;
+    setPageNumber(proxima);
+  };
+
   const handleNextPage = () => {
-    if (animeData?.hasNextPage) {
-      setPageNumber((prevState) => prevState + 1);
-    }
+    if (animeData?.hasNextPage) irParaPagina(pageNumber + 1);
   };
 
   const handlePrevPage = () => {
-    if (pageNumber > 1) {
-      setPageNumber((prevState) => prevState - 1);
-    }
+    if (pageNumber > 1) irParaPagina(pageNumber - 1);
   };
 
   useEffect(() => {
     getAnimeData(pageNumber);
+
+    if (pediuTroca.current) {
+      pediuTroca.current = false;
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }, [getAnimeData, pageNumber]);
 
-  const hasResults = !loading && (animeData?.results?.length ?? 0) > 0;
+  /**
+   * Os resultados que já estão na tela continuam nela enquanto a próxima
+   * página carrega, apenas esmaecidos. Trocá-los por doze esqueletos a cada
+   * clique fazia a grade piscar inteira e o usuário perder a referência do
+   * lugar. Os esqueletos ficam só para quando não há nada a mostrar ainda —
+   * a primeira carga e a troca de filtro.
+   */
+  const results = animeData?.results ?? [];
+  const hasResults = results.length > 0;
+  const showSkeletons = loading && !hasResults;
+  const isRefreshing = loading && hasResults;
+  /**
+   * "Nenhum anime encontrado" só depois de uma resposta de verdade. Sem esta
+   * guarda, chegar na busca com `?q=` já preenchido mostrava a mensagem de
+   * lista vazia no quadro entre a montagem e o disparo do efeito.
+   */
+  const showEmpty = !loading && !hasResults && !!animeData;
 
   const isRelease = variant === "release";
 
@@ -53,6 +86,16 @@ const AnimeGrid = ({
     isRelease && anime.episodeNumber
       ? `/anime/${anime.id}/${anime.episodeNumber}`
       : `/${media}/${anime.id}`;
+
+  /**
+   * A ficha é a primeira coisa que qualquer um dos dois destinos pede — tanto
+   * a página da obra quanto a do episódio começam por ela. Adiantá-la no hover
+   * cobre a maior parte da espera do clique.
+   */
+  const prefetchCard = (anime: AnimeProps) => () =>
+    media === "manga"
+      ? MangaService.getMangaDetails(anime.id)
+      : AnilistService.getAnimeDetails(anime.id);
 
   // Colunas fluidas: os cards nunca encostam porque o gap é fixo e a largura
   // de cada coluna se ajusta ao espaço disponível. O card de lançamento é
@@ -73,7 +116,7 @@ const AnimeGrid = ({
   } as const;
 
   return (
-    <Box width="100%">
+    <Box width="100%" ref={topRef}>
       <Typography
         variant="h4"
         fontWeight={500}
@@ -90,8 +133,20 @@ const AnimeGrid = ({
         {title}
       </Typography>
 
-      <Box sx={gridSx}>
-        {loading &&
+      <Box
+        sx={{
+          ...gridSx,
+          // A lista anterior continua legível durante a troca, mas sem aceitar
+          // clique: seguir um card que está prestes a sair do lugar levaria o
+          // usuário para a obra errada.
+          ...(isRefreshing && {
+            opacity: 0.45,
+            pointerEvents: "none",
+            transition: "opacity .2s ease",
+          }),
+        }}
+      >
+        {showSkeletons &&
           SKELETON_PLACEHOLDERS.map((_, index) =>
             isRelease ? (
               <Box key={index} width="100%">
@@ -114,14 +169,19 @@ const AnimeGrid = ({
           )}
 
         {hasResults &&
-          animeData.results.map((anime, index) => (
-            <Link key={anime.id + index} href={cardHref(anime)}>
+          results.map((anime, index) => (
+            <PrefetchLink
+              key={anime.id + index}
+              href={cardHref(anime)}
+              carregar={prefetchCard(anime)}
+            >
               <AnimeCard anime={anime} media={media} variant={variant} />
-            </Link>
+            </PrefetchLink>
           ))}
       </Box>
 
-      {!loading && !hasResults && <Typography>{emptyMessage}</Typography>}
+      {showEmpty && <Typography>{emptyMessage}</Typography>}
+
 
       <Box display="flex" gap={2} mt={4}>
         <Button

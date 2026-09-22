@@ -6,8 +6,11 @@ import {
   groupUpcomingByDay,
   timeUntilLabel,
 } from "@/utils/anime";
-import { Box, Paper, Skeleton, Stack, Typography, useTheme } from "@mui/material";
-import Image from "next/image";
+import { Box, Paper, Skeleton, Stack, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import FadingImage from "@/components/FadingImage";
+import { usePrefetchOnHover } from "@/hooks/usePrefetchOnHover";
+import AnilistService from "@/services/AnilistService";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -27,12 +30,16 @@ const UpcomingCard = ({
   now: number;
 }) => {
   const secondsLeft = episode.airingAt - Math.floor(now / 1000);
+  const prefetch = usePrefetchOnHover(() =>
+    AnilistService.getAnimeDetails(episode.id)
+  );
 
   return (
     <Paper
       component={Link}
       href={`/anime/${episode.id}`}
       elevation={0}
+      {...prefetch}
       sx={{
         display: "flex",
         gap: 1.25,
@@ -41,7 +48,7 @@ const UpcomingCard = ({
         p: 1,
         borderRadius: 2,
         textDecoration: "none",
-        transition: ".2s",
+        transition: "border-color .2s ease",
         backgroundColor: (theme) =>
           translucent(theme.vars.palette.primary.mainChannel, 0.04),
         border: (theme) =>
@@ -59,7 +66,7 @@ const UpcomingCard = ({
           overflow: "hidden",
         }}
       >
-        <Image
+        <FadingImage
           src={episode.image}
           alt=""
           aria-hidden
@@ -155,6 +162,7 @@ const UpcomingSchedule = ({
       </Typography>
 
       <Stack
+        className="faixa-rolavel"
         direction="row"
         gap={3}
         sx={{

@@ -1,14 +1,7 @@
 "use client";
 
 import SearchIcon from "@mui/icons-material/Search";
-import {
-  AppBar,
-  Box,
-  Button,
-  IconButton,
-  InputAdornment,
-  TextField,
-} from "@mui/material";
+import { AppBar, Box, Button, IconButton, InputAdornment, TextField } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -65,7 +58,10 @@ const NavbarComponent = () => {
         paddingInline: { xs: 2, sm: 3, md: 5 },
         backgroundColor: (theme) =>
           translucent(theme.vars.palette.brand.chromeChannel, 0.92),
-        backdropFilter: "blur(8px)",
+        // O cabeçalho é sticky e cobre 100vw: o desfoque é recalculado a cada
+        // quadro de rolagem. A 4px o efeito continua visível atrás do fundo,
+        // que já é quase opaco, pela metade do custo.
+        backdropFilter: "blur(4px)",
         borderBottom: (theme) =>
           `1px solid ${translucent(theme.vars.palette.brand.chromeContrastChannel, 0.12)}`,
         "& .MuiButtonBase-root, & > a": { minHeight: 44 },
@@ -130,7 +126,7 @@ const NavbarComponent = () => {
                 borderRadius: 5,
                 backgroundColor: (theme) =>
                   translucent(theme.vars.palette.brand.chromeContrastChannel, 0.12),
-                transition: ".2s",
+                transition: "background-color .2s ease",
                 "& fieldset": { border: "none" },
                 "&:hover, &.Mui-focused": {
                   backgroundColor: (theme) =>

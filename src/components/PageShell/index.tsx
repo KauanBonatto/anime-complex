@@ -1,7 +1,5 @@
 "use client";
 
-import Footer from "@/components/Footer";
-import Navbar from "@/components/Navbar";
 import { Box, Card, LinearProgress } from "@mui/material";
 import type { ReactNode } from "react";
 import { NAVBAR_HEIGHT } from "./height";
@@ -21,9 +19,13 @@ interface PageShellProps {
 }
 
 /**
- * Moldura de todas as páginas: progresso, navbar, superfície de conteúdo e
- * rodapé. Existe porque esse bloco estava copiado em todas as telas, cada uma
- * repetindo o mesmo cálculo de altura e o mesmo padding fixo.
+ * Superfície de conteúdo das páginas: progresso, o cartão e a largura máxima.
+ *
+ * A navbar e o rodapé moravam aqui, e como toda tela renderiza o PageShell
+ * eles ficavam abaixo da fronteira de rota — trocar de página desmontava e
+ * remontava o cabeçalho inteiro, apagando o que estivesse digitado na busca e
+ * refazendo o desfoque do fundo. Agora os dois estão no layout raiz, acima das
+ * telas, e sobrevivem à navegação; aqui fica só o que de fato é da página.
  */
 const PageShell = ({
   children,
@@ -31,7 +33,7 @@ const PageShell = ({
   centered = false,
   maxWidth = CONTENT_MAX_WIDTH,
 }: PageShellProps) => (
-  <Box width="100%">
+  <>
     {loading && (
       <LinearProgress
         color="primary"
@@ -39,13 +41,11 @@ const PageShell = ({
           width: "100%",
           position: "fixed",
           top: 0,
-          // Acima da navbar, que agora é fixa e passaria por cima da barra.
+          // Acima da navbar, que passaria por cima da barra.
           zIndex: (theme) => theme.zIndex.appBar + 1,
         }}
       />
     )}
-
-    <Navbar />
 
     <Card
       sx={{
@@ -79,9 +79,7 @@ const PageShell = ({
         {children}
       </Box>
     </Card>
-
-    <Footer />
-  </Box>
+  </>
 );
 
 export default PageShell;

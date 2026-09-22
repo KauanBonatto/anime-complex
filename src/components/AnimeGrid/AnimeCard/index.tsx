@@ -2,8 +2,9 @@ import { AnimeScoreBadge } from "@/components/AnimeScore";
 import ReleaseCard from "@/components/AnimeGrid/ReleaseCard";
 import { animeMetaLine } from "@/utils/anime";
 import { mangaMetaLine } from "@/utils/manga";
-import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
-import Image from "next/image";
+import FadingImage from "@/components/FadingImage";
+import { Box, Chip, Paper, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 interface AnimeCardProps {
   anime: AnimeProps;
@@ -35,9 +36,14 @@ const AnimeCard = ({
       <Box
         sx={{ position: "relative", width: "100%", aspectRatio: "180 / 254" }}
       >
-        <Image
+        <FadingImage
           className="anime-image"
-          style={{ borderRadius: 8, transition: ".3s", objectFit: "cover" }}
+          style={{
+            borderRadius: 8,
+            // Só o brilho muda no hover; a forma curta animaria `all`.
+            transition: "filter .3s ease",
+            objectFit: "cover",
+          }}
           alt={anime.title}
           src={anime.image}
           draggable={false}

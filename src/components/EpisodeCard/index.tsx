@@ -1,7 +1,8 @@
 import EpisodeThumb from "@/components/EpisodeThumb";
 import { durationLabel, episodeDateLabel } from "@/utils/anime";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
-import { Box, Paper, Stack, Typography, alpha } from "@mui/material";
+import { Box, Paper, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import Link from "next/link";
 import { translucent } from "@/theme/translucent";
 
@@ -38,7 +39,7 @@ const EpisodeCard = ({
           p: 0.75,
           borderRadius: 1.5,
           textDecoration: "none",
-          transition: ".2s",
+          transition: "background-color .2s ease, border-color .2s ease",
           backgroundColor: (theme) =>
             isCurrent ? translucent(theme.vars.palette.primary.mainChannel, 0.14) : "transparent",
           border: (theme) =>
@@ -92,7 +93,7 @@ const EpisodeCard = ({
         borderRadius: 2,
         overflow: "hidden",
         textDecoration: "none",
-        transition: ".2s",
+        transition: "border-color .2s ease",
         backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.04),
         border: (theme) =>
           `1px solid ${
@@ -124,7 +125,7 @@ const EpisodeCard = ({
             alignItems: "center",
             justifyContent: "center",
             opacity: 0,
-            transition: ".2s",
+            transition: "opacity .2s ease",
             backgroundColor: (theme) => alpha(theme.palette.brand.scrim, 0.45),
           }}
         >

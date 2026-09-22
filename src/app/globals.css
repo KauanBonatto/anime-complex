@@ -37,3 +37,29 @@ a {
 * {
   scrollbar-color: auto;
 }
+
+/* O cabeçalho é sticky e tem 108px: sem esta folga, qualquer rolagem até uma
+   âncora (a volta ao topo da grade ao paginar, um `scrollIntoView`) para com o
+   alvo escondido atrás dele. */
+html {
+  scroll-padding-top: 124px;
+}
+
+/* Nada de `scroll-behavior: smooth` aqui: ele valeria também para a rolagem
+   ao topo que o Next faz a cada navegação, e trocar de página passaria a
+   animar a subida mostrando o conteúdo antigo. Quem quer rolagem suave pede
+   por chamada — ver o `scrollIntoView` da paginação em AnimeGrid, que já
+   respeita `prefers-reduced-motion` pelo próprio navegador. */
+
+/* As faixas horizontais (temporadas, próximos episódios) rolam com o dedo no
+   celular e com a roda na diagonal no desktop, e paravam em qualquer lugar,
+   cortando um card ao meio. O encaixe é `proximity`, e não `mandatory`: ele
+   alinha quando a parada já está perto de um card e não sequestra a rolagem
+   quando a pessoa quis parar no meio. */
+.faixa-rolavel {
+  scroll-snap-type: x proximity;
+}
+
+.faixa-rolavel > * {
+  scroll-snap-align: start;
+}

@@ -33,6 +33,11 @@ const PANEL_WIDTH = 520;
  * o conteúdo para baixo; agora é um painel que desce do header, como o menu de
  * categorias dos catálogos de streaming.
  *
+ * O painel usa a superfície de conteúdo (`background.paper`), e não o chrome:
+ * pintado de roxo ele virava um segundo bloco da mesma cor pendurado na
+ * navbar, e no tema claro a tela inteira ficava roxa. Com o fundo neutro, o
+ * roxo da marca sobra para uma coisa só — dizer qual gênero está ligado.
+ *
  * O estado mora no GenreFilterProvider — o header é irmão das telas, não pai
  * delas, então o filtro não pode ser um `useState` local de nenhum dos dois.
  */
@@ -48,6 +53,7 @@ const GenreMenu = () => {
   } | null>(null);
 
   const open = !!anchorPosition;
+  const active = filters.length > 0;
 
   const openPanel = (event: React.MouseEvent<HTMLElement>) =>
     setAnchorPosition({
@@ -61,7 +67,7 @@ const GenreMenu = () => {
     onClick: openPanel,
     "aria-haspopup": true,
     "aria-expanded": open,
-    "aria-label": filters.length
+    "aria-label": active
       ? `Categorias, ${filters.length} ${filters.length === 1 ? "ativa" : "ativas"}`
       : "Categorias",
   } as const;
@@ -74,8 +80,18 @@ const GenreMenu = () => {
         {...triggerProps}
         sx={{
           display: { xs: "inline-flex", md: "none" },
-          color: "brand.chromeContrast",
           flexShrink: 0,
+          // Com filtro ligado o gatilho inverte: sólido sobre o chrome, para
+          // a barra avisar que a listagem está filtrada sem abrir o painel.
+          color: active ? "brand.chrome" : "brand.chromeContrast",
+          backgroundColor: active ? "brand.chromeContrast" : "transparent",
+          ":hover": {
+            backgroundColor: (theme) =>
+              translucent(
+                theme.vars.palette.brand.chromeContrastChannel,
+                active ? 0.85 : 0.12
+              ),
+          },
         }}
       >
         <Badge badgeContent={filters.length} color="error">
@@ -92,7 +108,7 @@ const GenreMenu = () => {
           <ExpandMoreIcon
             fontSize="small"
             sx={{
-              transition: ".2s",
+              transition: "transform .2s ease",
               transform: open ? "rotate(180deg)" : "none",
             }}
           />
@@ -101,16 +117,30 @@ const GenreMenu = () => {
           display: { xs: "none", md: "inline-flex" },
           flexShrink: 0,
           borderRadius: 5,
-          fontWeight: filters.length ? 600 : 400,
+          fontWeight: active ? 600 : 400,
           paddingInline: 1.5,
+          transition: "background-color .2s ease, color .2s ease",
+          color: active ? "brand.chrome" : "inherit",
           backgroundColor: (theme) =>
-            open
-              ? translucent(theme.vars.palette.brand.chromeContrastChannel, 0.12)
-              : "transparent",
+            active
+              ? theme.vars.palette.brand.chromeContrast
+              : open
+                ? translucent(
+                    theme.vars.palette.brand.chromeContrastChannel,
+                    0.12
+                  )
+                : "transparent",
+          ":hover": {
+            backgroundColor: (theme) =>
+              translucent(
+                theme.vars.palette.brand.chromeContrastChannel,
+                active ? 0.85 : 0.18
+              ),
+          },
         }}
       >
         Categorias
-        {!!filters.length && (
+        {active && (
           <Box
             component="span"
             sx={{
@@ -119,8 +149,9 @@ const GenreMenu = () => {
               borderRadius: 5,
               fontSize: "0.75rem",
               lineHeight: 1.6,
-              color: "brand.chrome",
-              backgroundColor: "brand.chromeContrast",
+              // Invertido em relação ao botão, que agora é o branco sólido.
+              color: "brand.chromeContrast",
+              backgroundColor: "brand.chrome",
             }}
           >
             {filters.length}
@@ -141,16 +172,10 @@ const GenreMenu = () => {
               width: { xs: `calc(100vw - 32px)`, sm: PANEL_WIDTH },
               maxHeight: `calc(100vh - ${NAVBAR_HEIGHT}px - 24px)`,
               borderRadius: 2,
-              color: "brand.chromeContrast",
-              backgroundColor: (theme) =>
-                translucent(theme.vars.palette.brand.chromeChannel, 0.97),
+              color: "text.primary",
+              backgroundColor: "background.paper",
               backgroundImage: "none",
-              backdropFilter: "blur(8px)",
-              border: (theme) =>
-                `1px solid ${translucent(
-                  theme.vars.palette.brand.chromeContrastChannel,
-                  0.12
-                )}`,
+              border: (theme) => `1px solid ${theme.vars.palette.divider}`,
             },
           },
         }}
@@ -163,29 +188,25 @@ const GenreMenu = () => {
         >
           <Typography
             variant="caption"
-            sx={{ letterSpacing: 1, opacity: 0.7, textTransform: "uppercase" }}
+            sx={{
+              letterSpacing: 1,
+              fontWeight: 600,
+              color: "text.secondary",
+              textTransform: "uppercase",
+            }}
           >
             Gêneros
+            {active && ` · ${filters.length}`}
           </Typography>
 
-          {!!filters.length && (
-            <Button
-              size="small"
-              color="inherit"
-              onClick={clearFilters}
-              sx={{ opacity: 0.8, ":hover": { opacity: 1 } }}
-            >
+          {active && (
+            <Button size="small" color="primary" onClick={clearFilters}>
               Limpar
             </Button>
           )}
         </Stack>
 
-        <Divider
-          sx={{
-            borderColor: (theme) =>
-              translucent(theme.vars.palette.brand.chromeContrastChannel, 0.12),
-          }}
-        />
+        <Divider />
 
         <Box
           sx={{
@@ -210,21 +231,25 @@ const GenreMenu = () => {
                 sx={{
                   justifyContent: "flex-start",
                   gap: 0.75,
-                  px: 1,
+                  px: 1.25,
                   py: 1,
-                  borderRadius: 1,
+                  // Pílula: o selecionado precisa de uma forma própria, não só
+                  // de um peso de fonte diferente.
+                  borderRadius: 5,
                   fontSize: "0.9375rem",
                   fontWeight: selected ? 600 : 400,
                   textAlign: "left",
-                  opacity: selected ? 1 : 0.8,
-                  transition: ".2s",
+                  transition: "background-color .2s ease, color .2s ease",
+                  color: selected ? "primary.contrastText" : "text.primary",
+                  backgroundColor: selected ? "primary.main" : "transparent",
                   ":hover": {
-                    opacity: 1,
                     backgroundColor: (theme) =>
-                      translucent(
-                        theme.vars.palette.brand.chromeContrastChannel,
-                        0.12
-                      ),
+                      selected
+                        ? theme.vars.palette.primary.dark
+                        : translucent(
+                            theme.vars.palette.text.primaryChannel,
+                            0.08
+                          ),
                   },
                 }}
               >

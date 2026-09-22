@@ -16,7 +16,11 @@ const MangaSearchView = () => {
   // A navbar manda o termo por query; daqui em diante quem manda é o campo.
   const initialSearch = searchParams?.get("q")?.trim() ?? "";
 
-  const [loading, setLoading] = useState(false);
+  // Com um termo já na URL a busca dispara na montagem, então a tela nasce
+  // carregando — senão o primeiro quadro é o de uma busca vazia.
+  const [loading, setLoading] = useState(
+    initialSearch.length >= MIN_SEARCH_LENGTH
+  );
   // O filtro vive no cabeçalho; aqui a tela só consome a escolha.
   const { filters } = useGenreFilters();
   const [search, setSearch] = useState<string>(initialSearch);

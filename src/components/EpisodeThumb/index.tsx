@@ -1,7 +1,7 @@
 "use client";
 
+import FadingImage from "@/components/FadingImage";
 import { Box, Typography } from "@mui/material";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 
 /**
@@ -59,7 +59,7 @@ const EpisodeThumb = ({
     >
       {imagem ? (
         isOptimized(imagem) ? (
-          <Image
+          <FadingImage
             className="episode-thumb"
             src={imagem}
             alt={alt}
@@ -67,7 +67,7 @@ const EpisodeThumb = ({
             sizes={sizes}
             draggable={false}
             onError={() => setFalhou(true)}
-            style={{ objectFit: "cover", transition: ".3s" }}
+            style={{ objectFit: "cover", transition: "transform .3s ease" }}
           />
         ) : (
           <Box
@@ -82,7 +82,7 @@ const EpisodeThumb = ({
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transition: ".3s",
+              transition: "transform .3s ease",
             }}
           />
         )

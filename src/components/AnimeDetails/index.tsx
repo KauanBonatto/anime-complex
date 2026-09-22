@@ -12,15 +12,7 @@ import {
   statusLabel,
 } from "@/utils/anime";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import {
-  Box,
-  Button,
-  Chip,
-  Divider,
-  Grid,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Chip, Divider, Grid, Stack, Typography } from "@mui/material";
 import Image from "next/image";
 import { useState } from "react";
 

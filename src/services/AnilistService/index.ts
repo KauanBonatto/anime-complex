@@ -93,10 +93,26 @@ const UPCOMING_WINDOW_KEY = "current";
  * Temporadas de uma franquia. Montar a lista custa uma requisição por elo, e o
  * resultado é o mesmo para qualquer temporada da mesma sequência — por isso
  * vale a pena persistir.
+ *
+ * A chave é canônica (o menor id da cadeia), e não a obra aberta: guardar uma
+ * cópia por temporada fazia a segunda temporada refazer a busca inteira que a
+ * primeira já tinha feito.
  */
 const franchiseCache = createCache<FranchiseSeasonProps[]>({
-  namespace: "anilist:franchise:v1",
+  namespace: "anilist:franchise:v2",
   ttl: LIST_TTL,
+  persist: true,
+});
+
+/**
+ * De qualquer temporada para a chave canônica da franquia dela. É o que
+ * permite abrir a 2ª temporada e reaproveitar a cadeia montada pela 1ª. São
+ * só dois números por entrada, então o teto é bem mais alto que o das listas.
+ */
+const franchiseAliasCache = createCache<string>({
+  namespace: "anilist:franchise-alias:v1",
+  ttl: LIST_TTL,
+  maxEntries: 300,
   persist: true,
 });
 
@@ -339,11 +355,37 @@ class AnilistServiceClass {
     const id = Number(anilistId);
     if (!id) return [];
 
-    return franchiseCache.resolve(
+    // `isCurrent` é o único campo que depende de qual temporada está aberta,
+    // então a cadeia guardada serve para todas — basta remarcar.
+    const marcarAtual = (seasons: FranchiseSeasonProps[]) =>
+      seasons.map((season) => ({
+        ...season,
+        isCurrent: season.id === String(id),
+      }));
+
+    const canonica = franchiseAliasCache.get(String(id));
+    if (canonica) {
+      const guardada = franchiseCache.get(canonica);
+      if (guardada) return marcarAtual(guardada);
+    }
+
+    const seasons = await franchiseCache.resolve(
       `franchise:${id}`,
       () => this.fetchFranchiseSeasons(id),
-      { shouldStore: (seasons) => seasons.length > 0 }
+      { shouldStore: (found) => found.length > 0 }
     );
+
+    if (seasons.length) {
+      // O menor id da cadeia é o mesmo a partir de qualquer membro dela, então
+      // serve de chave estável sem precisar saber quem é a primeira temporada.
+      const chave = `franchise:${Math.min(
+        ...seasons.map((season) => Number(season.id))
+      )}`;
+      franchiseCache.set(chave, seasons);
+      seasons.forEach((season) => franchiseAliasCache.set(season.id, chave));
+    }
+
+    return marcarAtual(seasons);
   }
 
   /**

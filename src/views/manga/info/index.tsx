@@ -2,9 +2,10 @@
 
 import MangaDetails from "@/components/MangaDetails";
 import PageShell from "@/components/PageShell";
+import { DetailsSkeleton } from "@/components/Skeletons";
 import MangaDexService from "@/services/MangaDexService";
 import MangaService from "@/services/MangaService";
-import { Grid, Skeleton } from "@mui/material";
+import { Grid } from "@mui/material";
 import { notFound } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -19,16 +20,26 @@ const MangaInfoView = ({ params }: { params: { manga_id: string } }) => {
   const getMangaInfoData = useCallback(async () => {
     setLoading(true);
 
-    // O AniList só tem sinopse em inglês; o MangaDex costuma ter a versão em
-    // pt-BR da mesma obra.
     const mangaDetailsData = await MangaService.getMangaDetails(mangaId);
-    setMangaDetails(
-      mangaDetailsData
-        ? await MangaDexService.localizeDescription(mangaDetailsData)
-        : null,
-    );
-    setNotFoundManga(!mangaDetailsData);
+    if (!mangaDetailsData) {
+      setNotFoundManga(true);
+      setLoading(false);
+      return;
+    }
+
+    // A ficha abre com o texto do AniList, que só tem sinopse em inglês. O
+    // MangaDex costuma ter a versão em pt-BR da mesma obra, mas encontrá-la
+    // custa uma busca por título de cada vez — esperar por isso deixava a tela
+    // em esqueleto. A tradução entra depois, e só se a página ainda estiver na
+    // mesma obra.
+    setMangaDetails(mangaDetailsData);
     setLoading(false);
+
+    MangaDexService.localizeDescription(mangaDetailsData).then((traduzido) => {
+      setMangaDetails((current) =>
+        current?.id === traduzido.id ? traduzido : current,
+      );
+    });
   }, [mangaId]);
 
   useEffect(() => {
@@ -40,21 +51,7 @@ const MangaInfoView = ({ params }: { params: { manga_id: string } }) => {
   return (
     <PageShell loading={loading}>
       {loading && (
-        <Grid container spacing={4}>
-          <Grid item xs={12}>
-            <Skeleton variant="rounded" height={240} />
-          </Grid>
-          <Grid item xs={12} sm="auto">
-            <Skeleton variant="rounded" width={230} height={325} />
-          </Grid>
-          <Grid item xs={12} sm>
-            <Skeleton variant="text" height={50} sx={{ maxWidth: 420 }} />
-            <Skeleton variant="text" sx={{ maxWidth: 260 }} />
-            <Skeleton variant="text" sx={{ mt: 3 }} />
-            <Skeleton variant="text" />
-            <Skeleton variant="text" sx={{ width: "70%" }} />
-          </Grid>
-        </Grid>
+        <DetailsSkeleton />
       )}
 
       {mangaDetails && (
