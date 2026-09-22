@@ -25,14 +25,10 @@ const SeasonStrip = ({ seasons }: { seasons: FranchiseSeasonProps[] }) => {
         direction="row"
         gap={2}
         sx={{
+          // A faixa rola sozinha; sem isto o excesso empurraria a página toda.
+          // A barra é a nativa, a mesma da página — ver globals.css.
           overflowX: "auto",
           pb: 1,
-          // A faixa rola sozinha; sem isto o excesso empurraria a página toda.
-          "&::-webkit-scrollbar": { height: 6 },
-          "&::-webkit-scrollbar-thumb": {
-            borderRadius: 3,
-            backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.3),
-          },
         }}
       >
         {seasons.map((season) => (

@@ -20,3 +20,20 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* A barra de rolagem é a nativa em toda parte — na página e em qualquer
+   elemento que role por dentro (as faixas horizontais, a lista lateral de
+   episódios). É ela que fica por cima do conteúdo, some sozinha quando
+   ninguém está rolando e acompanha o tema, porque o `color-scheme` que o
+   CssBaseline emite no <html> é herdado por todos os elementos.
+
+   Por isso nada no app declara `::-webkit-scrollbar`: a barra estilizada do
+   WebKit substitui a nativa por uma clássica, que reserva espaço no layout,
+   nunca some e fica com a cor fixa que o componente escolheu — foi essa
+   divergência que fez as faixas parecerem de outro app.
+
+   `scrollbar-color` é uma propriedade herdada: declarar `auto` aqui garante
+   que ninguém pinte a barra da página inteira sem querer. */
+* {
+  scrollbar-color: auto;
+}

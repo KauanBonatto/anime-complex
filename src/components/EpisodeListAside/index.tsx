@@ -63,15 +63,11 @@ const EpisodeListAside = ({
           xs: 460,
           lg: `calc(100vh - ${NAVBAR_HEIGHT + STICKY_GAP * 2}px)`,
         },
+        // A barra é a nativa, a mesma da página — ver globals.css.
         overflowY: "auto",
         borderRadius: 2,
         border: (theme) => `1px solid ${translucent(theme.vars.palette.primary.mainChannel, 0.15)}`,
         p: 1,
-        "&::-webkit-scrollbar": { width: 6 },
-        "&::-webkit-scrollbar-thumb": {
-          borderRadius: 3,
-          backgroundColor: (theme) => translucent(theme.vars.palette.primary.mainChannel, 0.3),
-        },
       }}
     >
       {!hasSeasons ? (
