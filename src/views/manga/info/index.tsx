@@ -1,5 +1,6 @@
 "use client";
 
+import MangaChapterList from "@/components/MangaChapterList";
 import MangaDetails from "@/components/MangaDetails";
 import PageShell from "@/components/PageShell";
 import { DetailsSkeleton } from "@/components/Skeletons";
@@ -58,6 +59,7 @@ const MangaInfoView = ({ params }: { params: { manga_id: string } }) => {
         <Grid container>
           <Grid item width="100%" mt={1} mb={5}>
             <MangaDetails manga={mangaDetails} />
+            <MangaChapterList manga={mangaDetails} />
           </Grid>
         </Grid>
       )}

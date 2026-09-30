@@ -31,7 +31,7 @@ const FooterComponent = () => {
           >
             SugoiAPI
           </Link>
-          {" · "}Sinopses de mangá via{" "}
+          {" · "}Sinopses e capítulos de mangá via{" "}
           <Link href="https://mangadex.org" style={{ color: theme.vars.palette.brand.link }}>
             MangaDex
           </Link>{" "}

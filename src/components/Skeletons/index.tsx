@@ -154,3 +154,13 @@ export const SearchSkeleton = () => (
     <GridSkeleton />
   </>
 );
+
+/** Barra do leitor e a primeira página de um capítulo. */
+export const ReaderSkeleton = () => (
+  <Box sx={{ maxWidth: 900, mx: "auto" }}>
+    <Skeleton variant="text" height={40} sx={{ maxWidth: 320 }} />
+    <Skeleton variant="text" sx={{ maxWidth: 200, mb: 2 }} />
+    <Skeleton variant="rounded" height={48} sx={{ mb: 3 }} />
+    <Skeleton variant="rounded" sx={{ width: "100%", height: "auto", aspectRatio: "7 / 10" }} />
+  </Box>
+);

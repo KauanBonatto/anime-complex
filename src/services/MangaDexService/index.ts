@@ -1,49 +1,58 @@
-import { ONE_DAY, createCache } from "@/utils/cache";
-import axios from "axios";
+import { ONE_DAY, ONE_HOUR, createCache } from "@/utils/cache";
 
 /**
- * Sinopses de mangá em pt-BR, vindas do MangaDex — o AniList só tem descrição
- * em inglês e o TMDB, que traduz as fichas de anime, não cataloga mangás.
+ * O lado do browser do MangaDex: sinopses em pt-BR (o AniList só tem
+ * descrição em inglês e o TMDB, que traduz as fichas de anime, não cataloga
+ * mangás), a lista de capítulos e as páginas do leitor.
  *
- * A API é pública e não pede chave. Em troca, a política de uso exige crédito
- * ao MangaDex e aos grupos de tradução, que fica no rodapé do site.
+ * Tudo passa pelo /api/mangadex/[op]: a API do MangaDex não libera CORS para
+ * outros domínios, e do servidor as respostas ainda ficam na CDN para todos.
  */
-const mangadexApi = axios.create({ baseURL: "https://api.mangadex.org" });
-
-/** Quantos resultados conferimos antes de desistir do casamento por ID. */
-const SEARCH_LIMIT = 5;
 
 /**
  * Sinopse é texto fixo: uma vez traduzida, não muda. Um dia de cache no
  * browser evita repetir a busca a cada visita à ficha.
  */
 const descriptionCache = createCache<string | null>({
-  namespace: "mangadex:description",
+  // O sufixo separa das entradas gravadas quando a busca saía do browser e
+  // falhava por CORS — elas ficaram guardadas como "sem tradução".
+  namespace: "mangadex:description:v2",
   ttl: ONE_DAY,
   persist: true,
 });
 
-interface MangaDexManga {
-  attributes?: {
-    description?: Record<string, string>;
-    links?: Record<string, string>;
-  };
-}
-
 /**
- * As descrições do MangaDex são escritas em Markdown e às vezes terminam num
- * bloco de links do grupo de tradução. A ficha mostra texto puro.
+ * A lista de capítulos fica só em memória: obras longas passam de 2 mil
+ * capítulos, e isso encheria o localStorage. A CDN já responde rápido.
  */
-const cleanDescription = (description: string): string | null => {
-  const text = description
-    // Corta o rodapé de links/créditos, separado por uma linha de traços.
-    .split(/\n\s*-{3,}\s*\n/)[0]
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`>#]/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+const feedCache = createCache<MangaChapterFeedProps | null>({
+  namespace: "mangadex:feed",
+  ttl: ONE_HOUR,
+  maxEntries: 10,
+});
 
-  return text || null;
+/** O endereço das páginas vence em uns 15 minutos; guardamos bem menos. */
+const PAGES_TTL = 5 * 60 * 1000;
+
+const pagesCache = createCache<MangaChapterPagesProps | null>({
+  namespace: "mangadex:pages",
+  ttl: PAGES_TTL,
+  maxEntries: 20,
+});
+
+/** Falha de rede vira exceção, para não ir para cache como "não tem". */
+const fromServer = async <T>(op: string, params: Record<string, string>) => {
+  const res = await fetch(`/api/mangadex/${op}?${new URLSearchParams(params)}`);
+  if (!res.ok) throw new Error(`/api/mangadex/${op} respondeu ${res.status}`);
+  return (await res.json()) as T;
+};
+
+const mangaParams = (manga: MangaDetailsProps) => {
+  const params: Record<string, string> = { id: manga.id, title: manga.title };
+  if (manga.titleEnglish && manga.titleEnglish !== manga.title) {
+    params.titleEnglish = manga.titleEnglish;
+  }
+  return params;
 };
 
 class MangaDexServiceClass {
@@ -57,57 +66,44 @@ class MangaDexServiceClass {
     // Uma falha de rede não vira cache: o fetch propaga o erro e o catch daqui
     // mantém a descrição em inglês só nesta visita.
     const description = await descriptionCache
-      .resolve(manga.id, () => this.fetchPtBrDescription(manga))
+      .resolve(manga.id, () =>
+        fromServer<string | null>("description", mangaParams(manga))
+      )
       .catch(() => null);
 
     return description ? { ...manga, description } : manga;
   }
 
   /**
-   * Devolve nulo quando não há tradução — esse "não tem" é resposta válida e
-   * vale cache. Erros de rede são propagados para não virarem cache.
+   * Capítulos em pt-BR e em inglês. Nulo quando a obra não está no MangaDex;
+   * rejeita em falha de rede, para a tela poder oferecer uma nova tentativa.
    */
-  private async fetchPtBrDescription(
-    manga: MangaDetailsProps
-  ): Promise<string | null> {
-    const titles = Array.from(
-      new Set([manga.title, manga.titleEnglish].filter((title): title is string => !!title))
+  getChapterFeed(manga: MangaDetailsProps) {
+    return feedCache.resolve(manga.id, () =>
+      fromServer<MangaChapterFeedProps | null>("chapters", mangaParams(manga))
     );
-
-    for (const title of titles) {
-      const match = await this.findByAnilistId(title, manga.id);
-      if (!match) continue;
-
-      // Achamos a obra certa: se ela não tem tradução, procurar pelo outro
-      // título só devolveria o mesmo registro.
-      const description = match.attributes?.description ?? {};
-      const ptBr = description["pt-br"] ?? description["pt"];
-      return ptBr ? cleanDescription(ptBr) : null;
-    }
-
-    return null;
   }
 
   /**
-   * O MangaDex não permite consultar por ID do AniList, só por título — e
-   * títulos casam a obra errada com facilidade ("Berserk" traz "Boushoku no
-   * Berserk"). Por isso buscamos por nome e só aceitamos o resultado cujo link
-   * para o AniList bate com o mangá que estamos exibindo.
+   * `fresh` ignora o cache: é o que o leitor pede quando uma imagem falha,
+   * sinal de que o servidor do MangaDex@Home sorteado saiu do ar ou venceu.
    */
-  private async findByAnilistId(
-    title: string,
-    anilistId: string
-  ): Promise<MangaDexManga | null> {
-    const { data } = await mangadexApi.get<{ data?: MangaDexManga[] }>(
-      "/manga",
-      { params: { limit: SEARCH_LIMIT, title } }
-    );
+  getChapterPages(chapterId: string, { fresh = false } = {}) {
+    if (!fresh) {
+      return pagesCache.resolve(chapterId, () =>
+        fromServer<MangaChapterPagesProps | null>("pages", { chapter: chapterId })
+      );
+    }
 
-    return (
-      data?.data?.find(
-        (entry) => String(entry.attributes?.links?.al ?? "") === anilistId
-      ) ?? null
-    );
+    // O `fresh` também passa pela URL: sem ele a CDN devolveria o mesmo
+    // endereço que acabou de falhar.
+    return fromServer<MangaChapterPagesProps | null>("pages", {
+      chapter: chapterId,
+      fresh: "1",
+    }).then((pages) => {
+      pagesCache.set(chapterId, pages);
+      return pages;
+    });
   }
 }
 

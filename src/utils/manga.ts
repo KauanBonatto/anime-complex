@@ -45,3 +45,64 @@ export const publicationYearsLabel = (
   if (endYear) return startYear === endYear ? String(startYear) : `${startYear} - ${endYear}`;
   return status === "RELEASING" ? `${startYear} - atual` : String(startYear);
 };
+
+export const MANGA_LANGUAGE_LABELS: Record<MangaLanguage, string> = {
+  "pt-br": "Português",
+  en: "Inglês",
+};
+
+/** "Cap. 12", ou "One-shot" quando o capítulo não tem número. */
+export const chapterLabel = (chapter: Pick<MangaChapterProps, "number">) =>
+  chapter.number ? `Cap. ${chapter.number}` : "One-shot";
+
+/** A versão que o leitor abre por padrão, se alguma abre aqui dentro. */
+export const readableVersion = (chapter: MangaChapterProps) =>
+  chapter.versions.find((version) => !version.externalUrl && version.pages > 0) ?? null;
+
+export const isChapterReadable = (chapter: MangaChapterProps) =>
+  !!readableVersion(chapter);
+
+/** Endereço do leitor para uma tradução específica de um capítulo. */
+export const chapterHref = (mangaId: string, versionId: string) =>
+  `/manga/${mangaId}/${versionId}`;
+
+/**
+ * Acha o capítulo dono de uma tradução. O leitor recebe só o ID da tradução
+ * na rota, e é daqui que tira o idioma e os vizinhos.
+ */
+export const locateChapter = (feed: MangaChapterFeedProps, versionId: string) => {
+  for (const language of Object.keys(feed.chapters) as MangaLanguage[]) {
+    const chapters = feed.chapters[language];
+    const index = chapters.findIndex((chapter) =>
+      chapter.versions.some((version) => version.id === versionId)
+    );
+    if (index >= 0) {
+      return {
+        language,
+        chapters,
+        index,
+        chapter: chapters[index],
+        version: chapters[index].versions.find((version) => version.id === versionId)!,
+      };
+    }
+  }
+  return null;
+};
+
+/** O capítulo legível mais próximo numa direção, pulando os externos. */
+export const neighbourChapter = (
+  chapters: MangaChapterProps[],
+  index: number,
+  step: 1 | -1
+) => {
+  for (let i = index + step; i >= 0 && i < chapters.length; i += step) {
+    if (isChapterReadable(chapters[i])) return chapters[i];
+  }
+  return null;
+};
+
+/** Idioma que a ficha abre: pt-BR quando há algo legível nele. */
+export const preferredLanguage = (feed: MangaChapterFeedProps): MangaLanguage =>
+  feed.chapters["pt-br"].some(isChapterReadable) || !feed.chapters.en.length
+    ? "pt-br"
+    : "en";
