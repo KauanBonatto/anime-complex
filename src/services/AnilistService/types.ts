@@ -59,13 +59,17 @@ export interface AnilistMedia {
   } | null;
 }
 
-/** Uma relação entre obras: sequência, prequela, adaptação, spin-off... */
+/**
+ * Uma relação entre obras: sequência, prequela, adaptação, spin-off... A
+ * consulta da franquia traz o vizinho já completo, com as relações dele; as
+ * outras trazem só o id e o tipo.
+ */
 export interface AnilistRelationEdge {
   relationType: string | null;
-  node: {
+  node: ({
     id: number;
     type?: string | null;
-  } | null;
+  } & Partial<AnilistMedia>) | null;
 }
 
 export interface AnilistAiringSchedule {

@@ -12,10 +12,12 @@ import {
   DEFAULT_COVER,
   EMPTY_RESPONSE,
   anilistRequest,
+  fromServer,
   genresKey,
+  isBrowser,
 } from "./client";
 import { cleanDescription, formatLabel } from "@/utils/anime";
-import { ONE_HOUR, createCache } from "@/utils/cache";
+import { ONE_DAY, ONE_HOUR, createCache } from "@/utils/cache";
 
 const PER_PAGE = 24;
 
@@ -47,10 +49,33 @@ const UPCOMING_LIMIT = 30;
 /**
  * Catálogo e fichas mudam devagar — uma temporada nova por trimestre, notas
  * que oscilam em casas decimais. Uma hora de cache deixa a navegação
- * instantânea e mantém o consumo do rate limit do AniList (90 requisições por
- * minuto por IP) bem longe do teto.
+ * instantânea e mantém o consumo do rate limit do AniList (30 requisições por
+ * minuto por IP, em modo degradado) longe do teto.
  */
 const LIST_TTL = ONE_HOUR;
+
+/**
+ * As grades de exibição andam mais rápido: um episódio novo sai a cada poucos
+ * minutos na temporada. Meia hora ainda cabe folgada na cota.
+ */
+const AIRING_TTL = ONE_HOUR / 2;
+
+/** A cadeia de temporadas só muda quando uma sequência é anunciada. */
+const FRANCHISE_TTL = ONE_DAY;
+
+/**
+ * Validade de cada tipo de consulta. O handler /api/anilist/[op] repete os
+ * mesmos valores no Cache-Control, para a CDN acompanhar o Data Cache.
+ */
+export const ANILIST_TTL = {
+  list: LIST_TTL,
+  airing: AIRING_TTL,
+  details: LIST_TTL,
+  franchise: FRANCHISE_TTL,
+};
+
+/** O Data Cache do Next conta em segundos. */
+const seconds = (ttl: number) => Math.floor(ttl / 1000);
 
 /** Listas paginadas: populares, recentes e buscas. */
 const listCache = createCache<ResponseApiProps>({
@@ -74,7 +99,7 @@ const detailsCache = createCache<AnimeDetailsProps | null>({
  */
 const airingWindowCache = createCache<AnimeProps[]>({
   namespace: "anilist:airing-window",
-  ttl: LIST_TTL,
+  ttl: AIRING_TTL,
   maxEntries: 1,
 });
 
@@ -83,7 +108,7 @@ const AIRING_WINDOW_KEY = "current";
 /** Mesma ideia da janela de recentes: lista grande, só em memória. */
 const upcomingWindowCache = createCache<UpcomingEpisodeProps[]>({
   namespace: "anilist:upcoming-window",
-  ttl: LIST_TTL,
+  ttl: AIRING_TTL,
   maxEntries: 1,
 });
 
@@ -100,7 +125,7 @@ const UPCOMING_WINDOW_KEY = "current";
  */
 const franchiseCache = createCache<FranchiseSeasonProps[]>({
   namespace: "anilist:franchise:v2",
-  ttl: LIST_TTL,
+  ttl: FRANCHISE_TTL,
   persist: true,
 });
 
@@ -111,7 +136,7 @@ const franchiseCache = createCache<FranchiseSeasonProps[]>({
  */
 const franchiseAliasCache = createCache<string>({
   namespace: "anilist:franchise-alias:v1",
-  ttl: LIST_TTL,
+  ttl: FRANCHISE_TTL,
   maxEntries: 300,
   persist: true,
 });
@@ -123,8 +148,9 @@ const franchiseAliasCache = createCache<string>({
 const SEASON_RELATIONS = new Set(["PREQUEL", "SEQUEL", "PARENT"]);
 
 /**
- * Teto de elos visitados. Cada um é uma requisição, e o AniList permite 90 por
- * minuto por IP — franquias muito longas param aqui em vez de gastar a cota.
+ * Teto de elos visitados. Cada consulta traz um elo e os vizinhos dele, então
+ * oito elos custam umas três requisições — e franquias muito longas param aqui
+ * em vez de gastar a cota.
  */
 const MAX_FRANCHISE_NODES = 8;
 
@@ -141,9 +167,12 @@ class AnilistServiceClass {
   ): Promise<ResponseApiProps> {
     const key = `popular:${page}:${genresKey(genres)}`;
     return this.cachedList(key, async () => {
+      if (isBrowser) return this.fromServer("anime-popular", { page, genres });
+
       const data = await this.request<{ Page: AnilistPage }>(
         POPULAR_ANIME_QUERY,
-        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined }
+        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined },
+        { revalidate: seconds(LIST_TTL) }
       );
       return this.toResponse(data?.Page, page);
     });
@@ -161,9 +190,12 @@ class AnilistServiceClass {
     if (genres.length) {
       const key = `recent:${page}:${genresKey(genres)}`;
       return this.cachedList(key, async () => {
+        if (isBrowser) return this.fromServer("anime-recent", { page, genres });
+
         const data = await this.request<{ Page: AnilistPage }>(
           RECENT_ANIME_QUERY,
-          { page, perPage: PER_PAGE, genres }
+          { page, perPage: PER_PAGE, genres },
+          { revalidate: seconds(LIST_TTL) }
         );
         return this.toResponse(data?.Page, page);
       });
@@ -180,24 +212,38 @@ class AnilistServiceClass {
     };
   }
 
-  /** Janela de episódios recentes já ordenada por popularidade, com cache. */
-  private async getRecentEpisodesWindow(): Promise<AnimeProps[]> {
+  /**
+   * Janela de episódios recentes já ordenada por popularidade, com cache. O
+   * browser pede a janela inteira e pagina em memória: uma única entrada na
+   * CDN serve todas as páginas da lista.
+   */
+  async getRecentEpisodesWindow(): Promise<AnimeProps[]> {
     return airingWindowCache.resolve(
       AIRING_WINDOW_KEY,
-      () => this.fetchRecentEpisodesWindow(),
+      async () =>
+        isBrowser
+          ? (await fromServer<AnimeProps[]>("anime-airing")) ?? []
+          : this.fetchRecentEpisodesWindow(),
       { shouldStore: (episodes) => episodes.length > 0 }
     );
   }
 
   private async fetchRecentEpisodesWindow(): Promise<AnimeProps[]> {
-    const airingAt = Math.floor(Date.now() / 1000);
+    // O instante vai arredondado para o minuto: ele entra no corpo da consulta,
+    // e o corpo é a chave do Data Cache — com o segundo exato, nenhuma consulta
+    // seria igual à anterior.
+    const airingAt = Math.floor(Date.now() / 60_000) * 60;
     const pages = await Promise.all(
       Array.from({ length: AIRING_WINDOW_PAGES }, (_, index) =>
-        this.request<{ Page: AnilistPage }>(RECENT_EPISODES_QUERY, {
-          page: index + 1,
-          perPage: AIRING_WINDOW_PAGE_SIZE,
-          airingAt,
-        })
+        this.request<{ Page: AnilistPage }>(
+          RECENT_EPISODES_QUERY,
+          {
+            page: index + 1,
+            perPage: AIRING_WINDOW_PAGE_SIZE,
+            airingAt,
+          },
+          { revalidate: seconds(AIRING_TTL) }
+        )
       )
     );
 
@@ -228,13 +274,9 @@ class AnilistServiceClass {
   async getUpcomingEpisodes(
     genres: string[] = []
   ): Promise<UpcomingEpisodeProps[]> {
-    const window = await upcomingWindowCache.resolve(
-      UPCOMING_WINDOW_KEY,
-      () => this.fetchUpcomingEpisodes(),
-      { shouldStore: (episodes) => episodes.length > 0 }
-    );
+    const window = await this.getUpcomingWindow();
 
-    // A janela vale por uma hora, e nesse intervalo os primeiros episódios da
+    // A janela vale por meia hora, e nesse intervalo os primeiros episódios da
     // lista já podem ter ido ao ar — o calendário só mostra o que ainda vem.
     const now = Math.floor(Date.now() / 1000);
 
@@ -253,18 +295,39 @@ class AnilistServiceClass {
       .sort((a, b) => a.airingAt - b.airingAt);
   }
 
+  /**
+   * A semana inteira, sem filtro nem corte. É o que viaja do servidor: o filtro
+   * de gêneros é aplicado no browser, então qualquer combinação de gêneros
+   * reaproveita a mesma entrada da CDN.
+   */
+  async getUpcomingWindow(): Promise<UpcomingEpisodeProps[]> {
+    return upcomingWindowCache.resolve(
+      UPCOMING_WINDOW_KEY,
+      async () =>
+        isBrowser
+          ? (await fromServer<UpcomingEpisodeProps[]>("anime-upcoming")) ?? []
+          : this.fetchUpcomingEpisodes(),
+      { shouldStore: (episodes) => episodes.length > 0 }
+    );
+  }
+
   private async fetchUpcomingEpisodes(): Promise<UpcomingEpisodeProps[]> {
-    const from = Math.floor(Date.now() / 1000);
+    // Arredondado para o minuto pelo mesmo motivo da janela de recentes.
+    const from = Math.floor(Date.now() / 60_000) * 60;
     const until = from + UPCOMING_WINDOW_DAYS * 24 * 60 * 60;
 
     const pages = await Promise.all(
       Array.from({ length: UPCOMING_PAGES }, (_, index) =>
-        this.request<{ Page: AnilistPage }>(UPCOMING_EPISODES_QUERY, {
-          page: index + 1,
-          perPage: UPCOMING_PAGE_SIZE,
-          from,
-          until,
-        })
+        this.request<{ Page: AnilistPage }>(
+          UPCOMING_EPISODES_QUERY,
+          {
+            page: index + 1,
+            perPage: UPCOMING_PAGE_SIZE,
+            from,
+            until,
+          },
+          { revalidate: seconds(AIRING_TTL) }
+        )
       )
     );
 
@@ -314,6 +377,14 @@ class AnilistServiceClass {
 
     const key = `search:${term.toLowerCase()}:${page}:${genresKey(genres)}`;
     return this.cachedList(key, async () => {
+      if (isBrowser) {
+        return this.fromServer("anime-search", {
+          q: term.toLowerCase(),
+          page,
+          genres,
+        });
+      }
+
       const data = await this.request<{ Page: AnilistPage }>(
         SEARCH_ANIME_QUERY,
         {
@@ -321,7 +392,8 @@ class AnilistServiceClass {
           perPage: PER_PAGE,
           search: term,
           genres: genres.length ? genres : undefined,
-        }
+        },
+        { revalidate: seconds(LIST_TTL) }
       );
       return this.toResponse(data?.Page, page);
     });
@@ -335,7 +407,10 @@ class AnilistServiceClass {
 
     return detailsCache.resolve(
       `details:${id}`,
-      () => this.fetchAnimeDetails(id),
+      () =>
+        isBrowser
+          ? fromServer<AnimeDetailsProps>("anime-details", { id })
+          : this.fetchAnimeDetails(id),
       // Uma falha de rede não pode esconder o anime pela hora seguinte.
       { shouldStore: (details) => details !== null }
     );
@@ -371,7 +446,12 @@ class AnilistServiceClass {
 
     const seasons = await franchiseCache.resolve(
       `franchise:${id}`,
-      () => this.fetchFranchiseSeasons(id),
+      async () =>
+        isBrowser
+          ? (await fromServer<FranchiseSeasonProps[]>("anime-franchise", {
+              id,
+            })) ?? []
+          : this.fetchFranchiseSeasons(id),
       { shouldStore: (found) => found.length > 0 }
     );
 
@@ -389,9 +469,15 @@ class AnilistServiceClass {
   }
 
   /**
-   * Busca em largura pela cadeia da franquia. Cada elo custa uma requisição, e
-   * o percurso para no teto de nós — o que já foi encontrado é devolvido do
-   * mesmo jeito, porque uma lista parcial ainda navega melhor que nenhuma.
+   * Busca em largura pela cadeia da franquia. Cada consulta devolve o elo pedido
+   * e os vizinhos já completos, com as relações deles — só quem está a dois
+   * passos de um elo consultado custa uma requisição nova. O percurso para no
+   * teto de nós, e o que já foi encontrado é devolvido do mesmo jeito.
+   *
+   * Uma consulta que falha (quase sempre um 429) derruba a busca inteira: a
+   * lista parcial seria guardada por um dia como se fosse a franquia completa.
+   * Vazia, nada é guardado, e a próxima tentativa reaproveita do Data Cache os
+   * elos que já tinham respondido.
    */
   private async fetchFranchiseSeasons(
     rootId: number
@@ -399,16 +485,30 @@ class AnilistServiceClass {
     const visited = new Set<number>([rootId]);
     const queue: number[] = [rootId];
     const nodes: AnilistMedia[] = [];
+    /** Elos que chegaram completos como vizinhos de uma consulta anterior. */
+    const known = new Map<number, AnilistMedia>();
 
     while (queue.length && visited.size <= MAX_FRANCHISE_NODES) {
       const currentId = queue.shift();
       if (currentId === undefined) break;
 
-      const data = await this.request<{ Media: AnilistMedia }>(FRANCHISE_QUERY, {
-        id: currentId,
-      });
-      const media = data?.Media;
-      if (!media) continue;
+      let media = known.get(currentId);
+      if (!media) {
+        const data = await this.request<{ Media: AnilistMedia }>(
+          FRANCHISE_QUERY,
+          { id: currentId },
+          { revalidate: seconds(FRANCHISE_TTL) }
+        );
+        media = data?.Media;
+        if (!media) return [];
+
+        for (const edge of media.relations?.edges ?? []) {
+          const neighbour = edge?.node;
+          if (neighbour?.id && neighbour.relations) {
+            known.set(neighbour.id, neighbour as AnilistMedia);
+          }
+        }
+      }
 
       nodes.push(media);
 
@@ -470,7 +570,8 @@ class AnilistServiceClass {
   ): Promise<AnimeDetailsProps | null> {
     const data = await this.request<{ Media: AnilistMedia }>(
       ANIME_DETAILS_QUERY,
-      { id }
+      { id },
+      { revalidate: seconds(LIST_TTL) }
     );
     if (!data?.Media) return null;
 
@@ -508,6 +609,19 @@ class AnilistServiceClass {
     return listCache.resolve(key, loader, {
       shouldStore: (response) => response.results.length > 0,
     });
+  }
+
+  private async fromServer(
+    op: string,
+    params: Record<string, string | number | string[]>
+  ): Promise<ResponseApiProps> {
+    const page = Number(params.page) || 1;
+    return (
+      (await fromServer<ResponseApiProps>(op, params)) ?? {
+        ...EMPTY_RESPONSE,
+        currentPage: page,
+      }
+    );
   }
 
   private toResponse(

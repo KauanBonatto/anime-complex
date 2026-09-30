@@ -159,35 +159,53 @@ export const ANIME_DETAILS_QUERY = `
   }
 `;
 
+const FRANCHISE_FIELDS = `
+  id
+  type
+  title {
+    romaji
+    english
+  }
+  coverImage {
+    large
+  }
+  format
+  status
+  episodes
+  seasonYear
+  startDate {
+    year
+  }
+`;
+
+const RELATION_IDS = `
+  relations {
+    edges {
+      relationType
+      node {
+        id
+        type
+      }
+    }
+  }
+`;
+
 /**
  * Um elo da franquia. No AniList cada temporada é uma obra separada, então a
- * lista de temporadas sai daqui: o nó pedido mais os IDs vizinhos, que o
- * serviço percorre para montar a sequência inteira.
+ * lista de temporadas sai daqui: o nó pedido e os vizinhos dele, já completos
+ * e com os IDs dos vizinhos seguintes. Com os dois níveis numa consulta só, o
+ * serviço percorre a sequência inteira com cerca de um terço das requisições.
  */
 export const FRANCHISE_QUERY = `
   query Franchise($id: Int) {
     Media(id: $id, type: ANIME) {
-      id
-      title {
-        romaji
-        english
-      }
-      coverImage {
-        large
-      }
-      format
-      status
-      episodes
-      seasonYear
-      startDate {
-        year
-      }
+      ${FRANCHISE_FIELDS}
       relations {
         edges {
           relationType
           node {
-            id
-            type
+            ${FRANCHISE_FIELDS}
+            ${RELATION_IDS}
           }
         }
       }

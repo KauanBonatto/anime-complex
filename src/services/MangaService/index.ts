@@ -16,12 +16,17 @@ import {
   DEFAULT_COVER,
   EMPTY_RESPONSE,
   anilistRequest,
+  fromServer,
   genresKey,
+  isBrowser,
 } from "../AnilistService/client";
 import { cleanDescription } from "@/utils/anime";
 import { ONE_HOUR, createCache } from "@/utils/cache";
 
 const PER_PAGE = 24;
+
+/** O Data Cache do Next conta em segundos. */
+const REVALIDATE = { revalidate: ONE_HOUR / 1000 };
 
 /**
  * Janela dos "lançamentos recentes". Um ano é o suficiente para uma obra nova
@@ -76,9 +81,12 @@ class MangaServiceClass {
   ): Promise<ResponseApiProps> {
     const key = `popular:${page}:${genresKey(genres)}`;
     return this.cachedList(key, async () => {
+      if (isBrowser) return this.fromServer("manga-popular", { page, genres });
+
       const data = await this.request<{ Page: AnilistMangaPage }>(
         POPULAR_MANGA_QUERY,
-        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined }
+        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined },
+        REVALIDATE
       );
       return this.toResponse(data?.Page, page);
     });
@@ -91,9 +99,12 @@ class MangaServiceClass {
   ): Promise<ResponseApiProps> {
     const key = `top:${page}:${genresKey(genres)}`;
     return this.cachedList(key, async () => {
+      if (isBrowser) return this.fromServer("manga-top", { page, genres });
+
       const data = await this.request<{ Page: AnilistMangaPage }>(
         TOP_RATED_MANGA_QUERY,
-        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined }
+        { page, perPage: PER_PAGE, genres: genres.length ? genres : undefined },
+        REVALIDATE
       );
       return this.toResponse(data?.Page, page);
     });
@@ -106,6 +117,8 @@ class MangaServiceClass {
   ): Promise<ResponseApiProps> {
     const key = `recent:${page}:${genresKey(genres)}`;
     return this.cachedList(key, async () => {
+      if (isBrowser) return this.fromServer("manga-recent", { page, genres });
+
       const data = await this.request<{ Page: AnilistMangaPage }>(
         RECENT_MANGA_QUERY,
         {
@@ -113,7 +126,8 @@ class MangaServiceClass {
           perPage: PER_PAGE,
           genres: genres.length ? genres : undefined,
           startDate: fuzzyDateYearsAgo(RECENT_WINDOW_YEARS),
-        }
+        },
+        REVALIDATE
       );
       const response = this.toResponse(data?.Page, page);
       const minYear = new Date().getFullYear() - RECENT_WINDOW_YEARS;
@@ -137,6 +151,14 @@ class MangaServiceClass {
 
     const key = `search:${term.toLowerCase()}:${page}:${genresKey(genres)}`;
     return this.cachedList(key, async () => {
+      if (isBrowser) {
+        return this.fromServer("manga-search", {
+          q: term.toLowerCase(),
+          page,
+          genres,
+        });
+      }
+
       const data = await this.request<{ Page: AnilistMangaPage }>(
         SEARCH_MANGA_QUERY,
         {
@@ -144,7 +166,8 @@ class MangaServiceClass {
           perPage: PER_PAGE,
           search: term,
           genres: genres.length ? genres : undefined,
-        }
+        },
+        REVALIDATE
       );
       return this.toResponse(data?.Page, page);
     });
@@ -158,7 +181,10 @@ class MangaServiceClass {
 
     return detailsCache.resolve(
       `details:${id}`,
-      () => this.fetchMangaDetails(id),
+      () =>
+        isBrowser
+          ? fromServer<MangaDetailsProps>("manga-details", { id })
+          : this.fetchMangaDetails(id),
       // Uma falha de rede não pode esconder o mangá pela hora seguinte.
       { shouldStore: (details) => details !== null }
     );
@@ -169,7 +195,8 @@ class MangaServiceClass {
   ): Promise<MangaDetailsProps | null> {
     const data = await this.request<{ Media: AnilistManga }>(
       MANGA_DETAILS_QUERY,
-      { id }
+      { id },
+      REVALIDATE
     );
     if (!data?.Media) return null;
 
@@ -201,6 +228,19 @@ class MangaServiceClass {
     return listCache.resolve(key, loader, {
       shouldStore: (response) => response.results.length > 0,
     });
+  }
+
+  private async fromServer(
+    op: string,
+    params: Record<string, string | number | string[]>
+  ): Promise<ResponseApiProps> {
+    const page = Number(params.page) || 1;
+    return (
+      (await fromServer<ResponseApiProps>(op, params)) ?? {
+        ...EMPTY_RESPONSE,
+        currentPage: page,
+      }
+    );
   }
 
   /**
