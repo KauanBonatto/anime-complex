@@ -108,6 +108,53 @@ export const animeSlugCandidates = (anime: AnimeProps) =>
     )
   );
 
+/** Formatos que entram na numeração contínua; filmes e OVAs ficam de fora. */
+const CONTINUOUS_FORMATS = new Set(["TV", "TV_SHORT", "ONA"]);
+
+/** Quantas temporadas anteriores vale tentar, da mais próxima para trás. */
+const MAX_CONTINUATIONS = 2;
+
+/**
+ * O AniList trata cada parte de uma temporada como uma obra separada, mas os
+ * sites costumam juntar as partes sob o título da primeira e seguir contando:
+ * "BLEACH: Sennen Kessen-hen - Ketsubetsu-tan", episódio 5, é
+ * "bleach-sennen-kessen-hen", episódio 18, no AnimesOnlineCC.
+ *
+ * Só vira candidata a temporada anterior cujo slug é o começo do slug da obra
+ * aberta — é o que distingue uma parte da mesma temporada de uma sequência com
+ * outro nome. O deslocamento soma os episódios de todas as séries entre as
+ * duas, e para quando uma delas não tem o total conhecido: a partir dali a
+ * conta sairia errada.
+ */
+export const continuousEpisodeCandidates = (
+  anime: AnimeProps,
+  seasons: FranchiseSeasonProps[],
+  episodeNumber: number
+): { slug: string; episode: number }[] => {
+  const current = seasons.findIndex((season) => season.id === anime.id);
+  if (current <= 0) return [];
+
+  const ownSlugs = animeSlugCandidates(anime);
+  const candidates: { slug: string; episode: number }[] = [];
+  let offset = 0;
+
+  for (let index = current - 1; index >= 0; index -= 1) {
+    const season = seasons[index];
+    if (!CONTINUOUS_FORMATS.has(season.format ?? "")) continue;
+    if (!season.totalEpisodes) break;
+
+    offset += season.totalEpisodes;
+
+    const slug = animeSlug(season.title);
+    if (!slug || !ownSlugs.some((own) => own.startsWith(`${slug}-`))) continue;
+
+    candidates.push({ slug, episode: episodeNumber + offset });
+    if (candidates.length >= MAX_CONTINUATIONS) break;
+  }
+
+  return candidates;
+};
+
 /**
  * Endereço da Crunchyroll para um episódio. Quando o AniList não lista aquele
  * episódio (comum em séries longas, que só têm uma janela cadastrada), o link

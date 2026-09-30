@@ -1,4 +1,5 @@
-import { animeSlugCandidates } from "@/utils/anime";
+import AnilistService from "@/services/AnilistService";
+import { animeSlugCandidates, continuousEpisodeCandidates } from "@/utils/anime";
 import axios from "axios";
 
 /**
@@ -7,6 +8,16 @@ import axios from "axios";
  */
 const DEFAULT_SEASON = 1;
 
+/**
+ * Providers que a busca tenta completar. Cada site escreve o título do seu
+ * jeito, então um slug que acerta um deles pode errar os outros — e só vale
+ * insistir enquanto algum ainda não achou o episódio.
+ *
+ * O AnimeFire fica de fora: o domínio que o provider dele usa saiu do ar, e
+ * contá-lo como faltante faria todo episódio passar por todas as tentativas.
+ */
+const PROVIDERS = ["animes-online-cc", "top-animes"];
+
 const sugoiApi = axios.create({ baseURL: "/api/episode" });
 
 interface EpisodeResponse {
@@ -14,29 +25,88 @@ interface EpisodeResponse {
   unavailable?: boolean;
 }
 
+interface Attempt {
+  slug: string;
+  episode: number;
+}
+
 class SugoiServiceClass {
   /**
-   * Busca os players de um episódio. Tenta os títulos conhecidos do anime até
-   * um deles bater com o slug usado pelos providers.
+   * Busca os players de um episódio, somando o que cada tentativa encontra:
+   * primeiro os títulos do anime, depois — só para os providers que ainda não
+   * acharam nada — a numeração contínua das partes anteriores da temporada.
    */
   async getEpisodeProviders(
     anime: AnimeProps,
     episodeNumber: number
   ): Promise<EpisodeProviderProps[]> {
-    for (const slug of animeSlugCandidates(anime)) {
-      const providers = await this.searchBySlug(slug, episodeNumber);
-      if (providers.length) return providers;
+    const found: EpisodeProviderProps[] = [];
+
+    const titles = animeSlugCandidates(anime).map((slug) => ({
+      slug,
+      episode: episodeNumber,
+    }));
+    for (const attempt of titles) {
+      if (!(await this.complete(found, attempt))) return found;
     }
-    return [];
+
+    // As temporadas já foram pedidas pela tela do episódio e costumam estar em
+    // cache; sem elas não há deslocamento para calcular.
+    const seasons = await AnilistService.getFranchiseSeasons(anime.id).catch(
+      () => []
+    );
+    for (const attempt of continuousEpisodeCandidates(
+      anime,
+      seasons,
+      episodeNumber
+    )) {
+      if (!(await this.complete(found, attempt))) return found;
+    }
+
+    return found;
   }
 
-  private async searchBySlug(
-    slug: string,
-    episodeNumber: number
+  /**
+   * Procura a tentativa nos providers que ainda faltam e acrescenta o que vier.
+   * Devolve se ainda sobrou algum provider sem player.
+   */
+  private async complete(
+    found: EpisodeProviderProps[],
+    attempt: Attempt
+  ): Promise<boolean> {
+    const missing = this.missing(found);
+    if (!missing.length) return false;
+
+    // Na primeira tentativa vão todos numa chamada só, como antes.
+    const results = found.length
+      ? await Promise.all(
+          missing.map((provider) => this.search(attempt, provider))
+        )
+      : [await this.search(attempt)];
+
+    const known = new Set(found.map((provider) => provider.url));
+    for (const provider of results.flat()) {
+      if (known.has(provider.url)) continue;
+      known.add(provider.url);
+      found.push(provider);
+    }
+
+    return this.missing(found).length > 0;
+  }
+
+  private missing(found: EpisodeProviderProps[]): string[] {
+    const present = new Set(found.map((provider) => provider.slug));
+    return PROVIDERS.filter((provider) => !present.has(provider));
+  }
+
+  private async search(
+    { slug, episode }: Attempt,
+    provider?: string
   ): Promise<EpisodeProviderProps[]> {
     try {
       const { data } = await sugoiApi.get<EpisodeResponse>(
-        `/${slug}/${DEFAULT_SEASON}/${episodeNumber}`
+        `/${slug}/${DEFAULT_SEASON}/${episode}`,
+        { params: provider ? { provider } : undefined }
       );
       return data?.providers ?? [];
     } catch (err) {
