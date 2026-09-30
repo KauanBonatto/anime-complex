@@ -13,10 +13,11 @@ const DEFAULT_SEASON = 1;
  * jeito, então um slug que acerta um deles pode errar os outros — e só vale
  * insistir enquanto algum ainda não achou o episódio.
  *
- * O AnimeFire fica de fora: o domínio que o provider dele usa saiu do ar, e
- * contá-lo como faltante faria todo episódio passar por todas as tentativas.
+ * O AnimeFire guarda as partes de uma temporada numa página só, com a conta
+ * corrida da série: a Ketsubetsu-tan ep 5 só é achada lá como "bleach" ep 384,
+ * que é a última tentativa da numeração contínua.
  */
-const PROVIDERS = ["animes-online-cc", "top-animes"];
+const PROVIDERS = ["animes-online-cc", "anime-fire", "top-animes"];
 
 const sugoiApi = axios.create({ baseURL: "/api/episode" });
 

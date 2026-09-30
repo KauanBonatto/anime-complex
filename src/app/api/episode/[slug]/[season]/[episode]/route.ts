@@ -7,6 +7,7 @@ import {
   showsAds,
   unwrapPlayer,
 } from "@/utils/topAnimes";
+import { isRelayedHls, relayUrl } from "@/utils/hlsRelay";
 import { NextResponse } from "next/server";
 
 /**
@@ -112,6 +113,8 @@ const toProvider = (
 ): EpisodeProviderProps => {
   const url = unwrapPlayer(rawUrl);
   const proxied = isWrappedPlayer(url);
+  // HLS de um CDN sem CORS para nós (AnimeFire): passa inteiro pelo /api/hls.
+  const relayed = isRelayedHls(url);
   // Playlist que o browser alcança sozinho, sem intermédio nenhum.
   const direct = url.includes(".m3u8");
 
@@ -120,10 +123,14 @@ const toProvider = (
     slug: provider.slug,
     hasAds: provider.has_ads || showsAds(url),
     // Deixa de ser embed: agora é uma playlist tocada no nosso player.
-    isEmbed: provider.is_embed && !proxied && !direct,
-    isHls: proxied || direct,
+    isEmbed: provider.is_embed && !proxied && !direct && !relayed,
+    isHls: proxied || direct || relayed,
     isExternal: refusesSandbox(url),
-    url: proxied ? `/api/stream?src=${encodeURIComponent(url)}` : url,
+    url: proxied
+      ? `/api/stream?src=${encodeURIComponent(url)}`
+      : relayed
+        ? relayUrl(url)
+        : url,
   };
 };
 

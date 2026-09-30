@@ -97,14 +97,103 @@ export const animeSlug = (title: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-/** Títulos alternativos aumentam a chance de achar o anime no provider. */
-export const animeSlugCandidates = (anime: AnimeProps) =>
+/** Os slugs dos títulos do anime, exatamente como o AniList os escreve. */
+const animeTitleSlugs = (anime: AnimeProps) =>
   Array.from(
     new Set(
       [anime.title, anime.titleEnglish]
         .filter((title): title is string => !!title)
         .map(animeSlug)
         .filter(Boolean)
+    )
+  );
+
+/**
+ * Numerais romanos que marcam temporada. "i", "v" e "x" ficam de fora: soltos
+ * no título costumam ser outra coisa ("hunter-x-hunter").
+ */
+const ROMAN_SEASONS: Record<string, number> = {
+  ii: 2,
+  iii: 3,
+  iv: 4,
+  vi: 6,
+  vii: 7,
+  viii: 8,
+  ix: 9,
+};
+
+const ORDINAL = /^(\d+)(?:st|nd|rd|th)$/;
+
+/**
+ * Onde está a temporada no slug e com quantas palavras ela foi escrita:
+ * "iii" (1), "3rd-season" (2), "season-3" (2). O título nunca começa por ela.
+ */
+const findSeasonMarker = (tokens: string[]) => {
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const next = tokens[index + 1];
+
+    if (ROMAN_SEASONS[token]) {
+      return { index, length: 1, season: ROMAN_SEASONS[token] };
+    }
+
+    const ordinal = ORDINAL.exec(token);
+    if (ordinal && next === "season") {
+      return { index, length: 2, season: Number(ordinal[1]) };
+    }
+
+    if (token === "season" && /^\d+$/.test(next ?? "")) {
+      return { index, length: 2, season: Number(next) };
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Cada site escreve a continuação de um jeito, e raramente como o AniList. A
+ * 3ª temporada de "mushoku-tensei-iii-isekai-ittara-honki-dasu" é
+ * "mushoku-tensei-3-isekai-ittara-honki-dasu" no Top Animes e
+ * "mushoku-tensei-isekai-ittara-honki-dasu-3" no AnimesOnlineCC. Daí as duas
+ * formas: o número no lugar da marca e o número no fim do título.
+ *
+ * A parte ("part-2") continua no fim nas duas, que é onde os sites a põem.
+ */
+export const seasonSlugVariants = (slug: string): string[] => {
+  const tokens = slug.split("-");
+  const marker = findSeasonMarker(tokens);
+  if (!marker || marker.season < 2) return [];
+
+  const before = tokens.slice(0, marker.index);
+  let after = tokens.slice(marker.index + marker.length);
+
+  const partAt = after.findIndex(
+    (token, index) =>
+      (token === "part" || token === "cour") && /^\d+$/.test(after[index + 1] ?? "")
+  );
+  const part = partAt >= 0 ? after.slice(partAt, partAt + 2) : [];
+  if (partAt >= 0) after = [...after.slice(0, partAt), ...after.slice(partAt + 2)];
+
+  const season = String(marker.season);
+  return Array.from(
+    new Set([
+      [...before, season, ...after, ...part].join("-"),
+      [...before, ...after, season, ...part].join("-"),
+    ])
+  ).filter((variant) => variant !== slug);
+};
+
+/**
+ * Os slugs a tentar nos providers, do mais provável ao menos: cada título do
+ * AniList seguido das formas que os sites costumam dar à temporada dele.
+ */
+export const animeSlugCandidates = (anime: AnimeProps) =>
+  Array.from(
+    new Set(
+      animeTitleSlugs(anime).flatMap((slug) => [
+        slug,
+        ...seasonSlugVariants(slug),
+      ])
     )
   );
 
@@ -134,7 +223,9 @@ export const continuousEpisodeCandidates = (
   const current = seasons.findIndex((season) => season.id === anime.id);
   if (current <= 0) return [];
 
-  const ownSlugs = animeSlugCandidates(anime);
+  // Só os títulos: "mushoku-tensei-isekai-ittara-honki-dasu-3", a variante da
+  // 3ª temporada, começa pelo slug da 1ª e passaria por parte dela.
+  const ownSlugs = animeTitleSlugs(anime);
   const candidates: { slug: string; episode: number }[] = [];
   let offset = 0;
 
