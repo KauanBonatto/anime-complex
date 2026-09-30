@@ -7,7 +7,13 @@
 html,
 body {
   max-width: 100vw;
+  /* `clip`, e não `hidden`: com `hidden` o body vira contêiner de rolagem —
+     sem nunca rolar, porque quem rola é o html — e todo `position: sticky`
+     passa a grudar nele, ou seja, em lugar nenhum. A navbar, o aside do
+     episódio e a barra do leitor dependem disso. O `hidden` fica só para
+     navegadores sem `clip`. */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Cor que aparece quando o scroll ultrapassa o topo ou o fim da página. O
