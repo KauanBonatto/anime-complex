@@ -184,18 +184,59 @@ export const seasonSlugVariants = (slug: string): string[] => {
 };
 
 /**
+ * O ano no fim é como os sites separam obras de mesmo nome:
+ * "dragon-quest-dai-no-daibouken-2020",
+ * "jojo-no-kimyou-na-bouken-stardust-crusaders-2014". O "(TV)" que o AniList
+ * usa para o mesmo fim dá lugar ao ano: "jojo-no-kimyou-na-bouken-2012".
+ */
+const yearSlugVariant = (slug: string, year?: string | number | null) => {
+  if (!year || slug.endsWith(`-${year}`)) return null;
+  return `${slug.replace(/-tv$/, "")}-${year}`;
+};
+
+/**
  * Os slugs a tentar nos providers, do mais provável ao menos: cada título do
- * AniList seguido das formas que os sites costumam dar à temporada dele.
+ * AniList seguido das formas que os sites costumam dar à temporada dele e, por
+ * último, o título romaji com o ano — o AnimesOnlineCC, que é quem usa o ano,
+ * nomeia pelo romaji, e cada tentativa a mais atrasa quem não achou nada.
  */
 export const animeSlugCandidates = (anime: AnimeProps) =>
   Array.from(
     new Set(
-      animeTitleSlugs(anime).flatMap((slug) => [
-        slug,
-        ...seasonSlugVariants(slug),
-      ])
+      [
+        ...animeTitleSlugs(anime).flatMap((slug) => [
+          slug,
+          ...seasonSlugVariants(slug),
+        ]),
+        yearSlugVariant(animeSlug(anime.title), anime.releaseDate),
+      ].filter((slug): slug is string => !!slug)
     )
   );
+
+/**
+ * O que nenhuma regra alcança, pelo id do AniList: nomes que o site inventou e
+ * obras que ele junta numa página só. `offset` soma ao episódio pedido.
+ */
+const SLUG_ALIASES: Record<string, { slug: string; offset?: number }> = {
+  // O AnimesOnlineCC põe o número da parte de JoJo no nome do Stone Ocean.
+  "131942": { slug: "jojo-no-kimyou-na-bouken-part-6-stone-ocean" },
+  // As OVAs de 1993 e de 2000 numa página só, na ordem em que saíram.
+  "666": { slug: "jojo-no-kimyou-na-bouken-stardust-crusaders-1993" },
+  "665": {
+    slug: "jojo-no-kimyou-na-bouken-stardust-crusaders-1993",
+    offset: 6,
+  },
+};
+
+export const aliasEpisodeCandidates = (
+  anime: AnimeProps,
+  episodeNumber: number
+): { slug: string; episode: number }[] => {
+  const alias = SLUG_ALIASES[anime.id];
+  return alias
+    ? [{ slug: alias.slug, episode: episodeNumber + (alias.offset ?? 0) }]
+    : [];
+};
 
 /** Formatos que entram na numeração contínua; filmes e OVAs ficam de fora. */
 const CONTINUOUS_FORMATS = new Set(["TV", "TV_SHORT", "ONA"]);
@@ -214,6 +255,9 @@ const MAX_CONTINUATIONS = 2;
  * outro nome. O deslocamento soma os episódios de todas as séries entre as
  * duas, e para quando uma delas não tem o total conhecido: a partir dali a
  * conta sairia errada.
+ *
+ * A temporada anterior também vai com o ano: "Stardust Crusaders - Egypt-hen",
+ * episódio 1, é "jojo-no-kimyou-na-bouken-stardust-crusaders-2014", episódio 25.
  */
 export const continuousEpisodeCandidates = (
   anime: AnimeProps,
@@ -228,6 +272,7 @@ export const continuousEpisodeCandidates = (
   const ownSlugs = animeTitleSlugs(anime);
   const candidates: { slug: string; episode: number }[] = [];
   let offset = 0;
+  let matched = 0;
 
   for (let index = current - 1; index >= 0; index -= 1) {
     const season = seasons[index];
@@ -239,8 +284,12 @@ export const continuousEpisodeCandidates = (
     const slug = animeSlug(season.title);
     if (!slug || !ownSlugs.some((own) => own.startsWith(`${slug}-`))) continue;
 
-    candidates.push({ slug, episode: episodeNumber + offset });
-    if (candidates.length >= MAX_CONTINUATIONS) break;
+    for (const variant of [slug, yearSlugVariant(slug, season.year)]) {
+      if (!variant) continue;
+      candidates.push({ slug: variant, episode: episodeNumber + offset });
+    }
+    matched += 1;
+    if (matched >= MAX_CONTINUATIONS) break;
   }
 
   return candidates;

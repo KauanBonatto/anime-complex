@@ -1,5 +1,6 @@
 import AnilistService from "@/services/AnilistService";
 import {
+  aliasEpisodeCandidates,
   animeSlugCandidates,
   continuousEpisodeCandidates,
   stageEpisodeCandidates,
@@ -38,7 +39,7 @@ interface Attempt {
 class SugoiServiceClass {
   /**
    * Busca os players de um episódio, somando o que cada tentativa encontra:
-   * primeiro os títulos do anime, depois — só para os providers que ainda não
+   * primeiro o nome conhecido de antemão, se houver, e os títulos do anime, depois — só para os providers que ainda não
    * acharam nada — a numeração contínua das partes anteriores da temporada e
    * dos estágios anteriores da obra.
    */
@@ -48,10 +49,13 @@ class SugoiServiceClass {
   ): Promise<EpisodeProviderProps[]> {
     const found: EpisodeProviderProps[] = [];
 
-    const titles = animeSlugCandidates(anime).map((slug) => ({
-      slug,
-      episode: episodeNumber,
-    }));
+    const titles = [
+      ...aliasEpisodeCandidates(anime, episodeNumber),
+      ...animeSlugCandidates(anime).map((slug) => ({
+        slug,
+        episode: episodeNumber,
+      })),
+    ];
     for (const attempt of titles) {
       if (!(await this.complete(found, attempt))) return found;
     }
