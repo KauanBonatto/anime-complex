@@ -246,6 +246,68 @@ export const continuousEpisodeCandidates = (
   return candidates;
 };
 
+/** O estágio no fim do título: "- 1st STAGE", "- 2nd & 3rd STAGE". */
+const STAGE_SUFFIX =
+  /\s*[-–:]?\s*(?:\d+(?:st|nd|rd|th)\s*(?:&|and|-)?\s*)+stage\s*$/i;
+
+/** O título sem o estágio, ou nulo quando ele não é dividido assim. */
+const stageBaseTitle = (title: string) =>
+  STAGE_SUFFIX.test(title) ? title.replace(STAGE_SUFFIX, "").trim() : null;
+
+/**
+ * Obras lançadas em estágios ficam numa página só nos sites, com a conta
+ * corrida: "JoJo no Kimyou na Bouken: Steel Ball Run - 2nd & 3rd STAGE",
+ * episódio 3, é "steel-ball-run-jojo-no-kimyou-na-bouken", episódio 4, no
+ * AnimesOnlineCC — o 1st STAGE foi o episódio 1. Além de cair o estágio, o
+ * nome da série pode ir para depois do subtítulo, então as duas ordens entram.
+ */
+const stageBaseSlugs = (titles: (string | null | undefined)[]) =>
+  Array.from(
+    new Set(
+      titles
+        .map((title) => (title ? stageBaseTitle(title) : null))
+        .filter((base): base is string => !!base)
+        .flatMap((base) => {
+          const colon = base.indexOf(":");
+          return colon > 0
+            ? [base, `${base.slice(colon + 1)} ${base.slice(0, colon)}`]
+            : [base];
+        })
+        .map(animeSlug)
+        .filter(Boolean)
+    )
+  );
+
+/**
+ * As tentativas pelo título-base de uma obra em estágios. O deslocamento soma
+ * os estágios anteriores, que precisam vir logo antes na franquia; sem a
+ * franquia não dá para saber se a obra aberta é o primeiro, e um número sem
+ * deslocamento acharia o episódio errado.
+ */
+export const stageEpisodeCandidates = (
+  anime: AnimeProps,
+  seasons: FranchiseSeasonProps[],
+  episodeNumber: number
+): { slug: string; episode: number }[] => {
+  const ownSlugs = stageBaseSlugs([anime.title, anime.titleEnglish]);
+  const current = seasons.findIndex((season) => season.id === anime.id);
+  if (!ownSlugs.length || current < 0) return [];
+
+  let offset = 0;
+  for (let index = current - 1; index >= 0; index -= 1) {
+    const season = seasons[index];
+    if (!CONTINUOUS_FORMATS.has(season.format ?? "")) continue;
+
+    const slugs = stageBaseSlugs([season.title]);
+    if (!slugs.some((slug) => ownSlugs.includes(slug))) break;
+    if (!season.totalEpisodes) return [];
+
+    offset += season.totalEpisodes;
+  }
+
+  return ownSlugs.map((slug) => ({ slug, episode: episodeNumber + offset }));
+};
+
 /**
  * Endereço da Crunchyroll para um episódio. Quando o AniList não lista aquele
  * episódio (comum em séries longas, que só têm uma janela cadastrada), o link

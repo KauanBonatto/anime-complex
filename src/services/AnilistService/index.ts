@@ -124,7 +124,7 @@ const UPCOMING_WINDOW_KEY = "current";
  * primeira já tinha feito.
  */
 const franchiseCache = createCache<FranchiseSeasonProps[]>({
-  namespace: "anilist:franchise:v2",
+  namespace: "anilist:franchise:v3",
   ttl: FRANCHISE_TTL,
   persist: true,
 });
@@ -538,9 +538,17 @@ class AnilistServiceClass {
     const year = (media: AnilistMedia) =>
       media.seasonYear ?? media.startDate?.year ?? null;
 
-    const ordered = [...nodes].sort(
-      (a, b) => (year(a) ?? Infinity) - (year(b) ?? Infinity)
-    );
+    // O ano desempata pelo mês e pelo dia: obras do mesmo ano, como os
+    // estágios de Steel Ball Run, ficariam na ordem em que a busca as achou —
+    // a obra aberta primeiro.
+    const startKey = (media: AnilistMedia) => {
+      const mediaYear = year(media);
+      if (mediaYear === null) return Infinity;
+      const { month, day } = media.startDate ?? {};
+      return mediaYear * 10_000 + (month ?? 13) * 100 + (day ?? 32);
+    };
+
+    const ordered = [...nodes].sort((a, b) => startKey(a) - startKey(b));
 
     // Só as séries entram na numeração; filmes e OVAs ficam com o formato como
     // rótulo, para não empurrar a contagem das temporadas de verdade.

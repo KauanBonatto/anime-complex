@@ -1,5 +1,9 @@
 import AnilistService from "@/services/AnilistService";
-import { animeSlugCandidates, continuousEpisodeCandidates } from "@/utils/anime";
+import {
+  animeSlugCandidates,
+  continuousEpisodeCandidates,
+  stageEpisodeCandidates,
+} from "@/utils/anime";
 import axios from "axios";
 
 /**
@@ -35,7 +39,8 @@ class SugoiServiceClass {
   /**
    * Busca os players de um episódio, somando o que cada tentativa encontra:
    * primeiro os títulos do anime, depois — só para os providers que ainda não
-   * acharam nada — a numeração contínua das partes anteriores da temporada.
+   * acharam nada — a numeração contínua das partes anteriores da temporada e
+   * dos estágios anteriores da obra.
    */
   async getEpisodeProviders(
     anime: AnimeProps,
@@ -56,11 +61,10 @@ class SugoiServiceClass {
     const seasons = await AnilistService.getFranchiseSeasons(anime.id).catch(
       () => []
     );
-    for (const attempt of continuousEpisodeCandidates(
-      anime,
-      seasons,
-      episodeNumber
-    )) {
+    for (const attempt of [
+      ...continuousEpisodeCandidates(anime, seasons, episodeNumber),
+      ...stageEpisodeCandidates(anime, seasons, episodeNumber),
+    ]) {
       if (!(await this.complete(found, attempt))) return found;
     }
 

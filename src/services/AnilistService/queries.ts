@@ -175,6 +175,8 @@ const FRANCHISE_FIELDS = `
   seasonYear
   startDate {
     year
+    month
+    day
   }
 `;
 
