@@ -124,7 +124,7 @@ const UPCOMING_WINDOW_KEY = "current";
  * primeira já tinha feito.
  */
 const franchiseCache = createCache<FranchiseSeasonProps[]>({
-  namespace: "anilist:franchise:v3",
+  namespace: "anilist:franchise:v4",
   ttl: FRANCHISE_TTL,
   persist: true,
 });
@@ -135,7 +135,7 @@ const franchiseCache = createCache<FranchiseSeasonProps[]>({
  * só dois números por entrada, então o teto é bem mais alto que o das listas.
  */
 const franchiseAliasCache = createCache<string>({
-  namespace: "anilist:franchise-alias:v1",
+  namespace: "anilist:franchise-alias:v2",
   ttl: FRANCHISE_TTL,
   maxEntries: 300,
   persist: true,
@@ -149,10 +149,15 @@ const SEASON_RELATIONS = new Set(["PREQUEL", "SEQUEL", "PARENT"]);
 
 /**
  * Teto de elos visitados. Cada consulta traz um elo e os vizinhos dele, então
- * oito elos custam umas três requisições — e franquias muito longas param aqui
- * em vez de gastar a cota.
+ * a JoJo (9 elos) custa cinco requisições e o Monogatari (14), sete — e uma vez
+ * por dia, já que a cadeia fica em cache para todos os elos. Franquias maiores
+ * que isso param aqui em vez de gastar a cota.
+ *
+ * Um teto menor que a franquia corta a ponta mais distante da obra aberta:
+ * com oito, a JoJo aberta pelo Steel Ball Run perdia a série de 2012, e a
+ * aberta pela de 2012 perdia o Steel Ball Run.
  */
-const MAX_FRANCHISE_NODES = 8;
+const MAX_FRANCHISE_NODES = 20;
 
 /** Formatos que contam como temporada numerada; o resto vira "Filme", "OVA"... */
 const NUMBERED_FORMATS = new Set(["TV", "TV_SHORT"]);
