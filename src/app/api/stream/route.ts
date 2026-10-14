@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
  * O Top Animes não entrega um player, e sim uma página que embrulha o vídeo —
  * e nenhuma das versões dela roda no nosso iframe. A antiga checa o
  * `document.referrer` e troca o próprio endereço pela home quando não
- * reconhece o domínio; a nova busca as fontes com `mode=api2`, de uma origem
+ * reconhece o domínio; a nova busca as fontes com `?mode=...`, de uma origem
  * que não libera CORS para nós.
  *
  * Este handler abre a página no servidor, onde nem Referer nem CORS atrapalham,
@@ -33,6 +33,14 @@ const PRIVATE_HOST =
   /^(localhost$|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[|.*\.(local|internal)$)/i;
 
 const REQUEST_TIMEOUT = 20_000;
+
+/**
+ * Nome do `mode` com que a página nova pede as fontes. O site já o trocou
+ * (`api2` virou `to-salvando-seu-ip`), então ele é lido da própria página e
+ * este valor só vale quando ela não o cita.
+ */
+const DEFAULT_API_MODE = "to-salvando-seu-ip";
+const API_MODE_IN_PAGE = /searchParams\.set\(\s*['"]mode['"]\s*,\s*['"]([^'"]+)['"]/;
 
 /** Extrai a URL do HLS do `jwplayer(...).setup({ sources: [{ file: ... }] })`. */
 const M3U8_IN_PAGE = /"file"\s*:\s*"([^"]+\.m3u8[^"]*)"/;
@@ -65,11 +73,16 @@ const fetchAsBrowser = (url: URL) =>
 
 /**
  * A versão nova não traz a playlist no HTML: a página pede as fontes a si mesma
- * com `mode=api2` e monta o JW Player com o que voltar.
+ * com `?mode=...` e monta o JW Player com o que voltar.
  */
 const resolveFromApi = async (page: URL) => {
+  const html = await fetchAsBrowser(page);
+  const mode = html.ok
+    ? API_MODE_IN_PAGE.exec(await html.text())?.[1] ?? DEFAULT_API_MODE
+    : DEFAULT_API_MODE;
+
   const endpoint = new URL(page);
-  endpoint.searchParams.set("mode", "api2");
+  endpoint.searchParams.set("mode", mode);
 
   const response = await fetchAsBrowser(endpoint);
   if (!response.ok) return null;

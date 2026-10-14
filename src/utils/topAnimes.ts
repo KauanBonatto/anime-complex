@@ -7,7 +7,7 @@
  *
  * - `/antivirus…`: checa o `document.referrer` e, fora do domínio deles, troca
  *   o próprio endereço pela home — era o que engolia o vídeo no nosso iframe;
- * - `sk-api.alibabacdn.net`: busca as fontes com `mode=api2`, de uma origem que
+ * - `sk-api.alibabacdn.net`: busca as fontes com `?mode=...`, de uma origem que
  *   não libera CORS para nós.
  */
 const WRAPPED_PLAYERS = ["topanimes.net/antivirus", "sk-api.alibabacdn.net"];
